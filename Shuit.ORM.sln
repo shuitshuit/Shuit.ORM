@@ -1,0 +1,43 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34219.65
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShuitNet.ORM", "ShuitNet.ORM\ShuitNet.ORM.csproj", "{C8409386-8F4F-4B58-9E41-A88F49856144}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShuitNet.ORM.MySQL", "ShuitNet.ORM.MySQL\ShuitNet.ORM.MySQL.csproj", "{3B9587CE-26BE-4464-BEBB-F5C77242614D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShuitNet.ORM.PostgreSQL", "ShuitNet.ORM.PostgreSQL\ShuitNet.ORM.PostgreSQL.csproj", "{FE42EC8C-96EF-6AFF-5F45-4EE5D13D218D}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "ソリューション項目", "ソリューション項目", "{2022CB0F-8BAF-F49E-0C48-8EF4C96EC109}"
+	ProjectSection(SolutionItems) = preProject
+		LICENSE.txt = LICENSE.txt
+		README.md = README.md
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C8409386-8F4F-4B58-9E41-A88F49856144}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{C8409386-8F4F-4B58-9E41-A88F49856144}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{C8409386-8F4F-4B58-9E41-A88F49856144}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{C8409386-8F4F-4B58-9E41-A88F49856144}.Release|Any CPU.Build.0 = Release|Any CPU
+		{3B9587CE-26BE-4464-BEBB-F5C77242614D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3B9587CE-26BE-4464-BEBB-F5C77242614D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3B9587CE-26BE-4464-BEBB-F5C77242614D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3B9587CE-26BE-4464-BEBB-F5C77242614D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FE42EC8C-96EF-6AFF-5F45-4EE5D13D218D}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FE42EC8C-96EF-6AFF-5F45-4EE5D13D218D}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FE42EC8C-96EF-6AFF-5F45-4EE5D13D218D}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FE42EC8C-96EF-6AFF-5F45-4EE5D13D218D}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {05514147-61D0-4DCE-AA74-EF0D4AB4B4E7}
+	EndGlobalSection
+EndGlobal

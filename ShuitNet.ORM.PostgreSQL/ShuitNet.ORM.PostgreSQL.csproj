@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net8.0</TargetFramework>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <Authors>shuit</Authors>
+    <Company>$(Authors).net</Company>
+    <NeutralLanguage>ja-JP</NeutralLanguage>
+    <Title>Shuit.SQL</Title>
+	<PackageLicenseExpression>MIT</PackageLicenseExpression>
+	<Version>1.2.0</Version>
+	<GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Npgsql" Version="9.0.3" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ShuitNet.ORM\ShuitNet.ORM.csproj" />
+  </ItemGroup>
+
+</Project>
