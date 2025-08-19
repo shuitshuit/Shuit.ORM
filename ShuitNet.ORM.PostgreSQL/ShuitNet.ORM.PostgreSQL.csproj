@@ -7,10 +7,13 @@
     <Authors>shuit</Authors>
     <Company>$(Authors).net</Company>
     <NeutralLanguage>ja-JP</NeutralLanguage>
-    <Title>Shuit.SQL</Title>
+    <Title>ShuitNet.ORM.PostgreSQL</Title>
 	<PackageLicenseExpression>MIT</PackageLicenseExpression>
 	<Version>1.2.0</Version>
-	<GeneratePackageOnBuild>False</GeneratePackageOnBuild>
+	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+	<PackageReadmeFile>README.md</PackageReadmeFile>
+	<RepositoryUrl></RepositoryUrl>
+	<PackageProjectUrl>https://github.com/shuitshuit/Shuit.ORM</PackageProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -19,6 +22,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShuitNet.ORM\ShuitNet.ORM.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

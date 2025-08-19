@@ -1,0 +1,164 @@
+# ShuitNet.ORM.PostgreSQL
+
+PostgreSQL用のShuitNet.ORMライブラリです。
+
+## 概要
+
+ShuitNet.ORM.PostgreSQLは、PostgreSQLデータベースに対応したObject-Relational Mapping (ORM) ライブラリです。シンプルなAPIでPostgreSQLデータベースの操作を簡単に行えます。
+
+## 特徴
+
+- **シンプルなAPI**: 直感的で使いやすいメソッド
+- **非同期対応**: async/awaitパターンをサポート
+- **属性ベース設定**: データクラスに属性を付与してマッピング設定
+- **命名規則の自動変換**: CamelCase, SnakeCase, KebabCase, PascalCaseに対応
+- **外部キー対応**: ForeignKey属性によるリレーション処理
+- **スキーマ対応**: PostgreSQLのスキーマ機能をサポート
+- **トランザクション対応**: 安全なデータ操作
+
+## インストール
+
+```bash
+dotnet add package ShuitNet.ORM.PostgreSQL
+```
+
+## 使用方法
+
+### 基本的な設定
+
+```csharp
+using ShuitNet.ORM.PostgreSQL;
+
+var connection = new PostgreSqlConnect("Host=localhost;Port=5432;Database=testdb;Username=user;Password=password");
+await connection.OpenAsync();
+```
+
+### データクラスの定義
+
+```csharp
+using ShuitNet.ORM.Attribute;
+
+public class User
+{
+    [Key]
+    public int Id { get; set; }
+    
+    public string Name { get; set; }
+    
+    public string Email { get; set; }
+    
+    [Ignore]
+    public string TemporaryData { get; set; }
+    
+    [Serial]
+    public DateTime CreatedAt { get; set; }
+}
+```
+
+### スキーマ対応
+
+PostgreSQLのスキーマ機能を使用する場合は、Name属性でスキーマを指定できます：
+
+```csharp
+[Name("public.users")]
+public class User
+{
+    // プロパティ定義
+}
+```
+
+### 基本的なCRUD操作
+
+#### データの挿入
+```csharp
+var user = new User { Name = "John Doe", Email = "john@example.com" };
+await connection.InsertAsync(user);
+```
+
+#### データの取得
+```csharp
+// プライマリキーで取得
+var user = await connection.GetAsync<User>(1);
+
+// 条件指定で取得
+var user = await connection.GetAsync<User>(new { Name = "John Doe" });
+
+// 複数レコードの取得
+var users = await connection.GetMultipleAsync<User>(new { Department = "IT" });
+
+// 全件取得
+var users = await connection.GetAllAsync<User>();
+
+// 条件付き取得
+var activeUsers = await connection.GetAllAsync<User>(u => u.IsActive);
+```
+
+#### データの更新
+```csharp
+user.Email = "newemail@example.com";
+await connection.UpdateAsync(user);
+```
+
+#### データの削除
+```csharp
+await connection.DeleteAsync<User>(1);
+```
+
+### カスタムクエリ
+
+```csharp
+// クエリの実行
+var users = await connection.QueryAsync<User>("SELECT * FROM users WHERE age > @age", new { age = 18 });
+
+// 単一レコードの取得
+var user = await connection.QueryFirstAsync<User>("SELECT * FROM users WHERE email = @email", new { email = "john@example.com" });
+
+// 非クエリの実行
+await connection.ExecuteAsync("UPDATE users SET last_login = NOW() WHERE id = @id", new { id = 1 });
+```
+
+### 命名規則
+
+デフォルトでは`CamelCase`が使用されますが、以下のように変更できます：
+
+```csharp
+PostgreSqlConnect.NamingCase = NamingCase.SnakeCase;
+```
+
+利用可能な命名規則：
+- `CamelCase`: firstName
+- `SnakeCase`: first_name
+- `KebabCase`: first-name
+- `PascalCase`: FirstName
+
+### トランザクション
+
+```csharp
+var transaction = await connection.BeginTransaction();
+try
+{
+    await connection.InsertAsync(user1);
+    await connection.InsertAsync(user2);
+    await transaction.CommitAsync();
+}
+catch
+{
+    await transaction.RollbackAsync();
+    throw;
+}
+```
+
+## 必要なパッケージ
+
+このパッケージは以下のパッケージに依存しています：
+
+- ShuitNet.ORM (コアライブラリ)
+- Npgsql (PostgreSQLデータベース接続)
+
+## ライセンス
+
+このプロジェクトはMITライセンスの下で公開されています。詳細については、[LICENSE.txt](LICENSE.txt)ファイルを参照してください。
+
+## 作者
+
+shuit (shuit.net)

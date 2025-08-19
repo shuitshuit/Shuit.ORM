@@ -4,6 +4,12 @@
     <TargetFramework>net8.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
+    <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
+    <Company>shuit.net</Company>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <Authors>shuit</Authors>
+    <RepositoryUrl></RepositoryUrl>
+    <PackageProjectUrl>https://github.com/shuitshuit/Shuit.ORM</PackageProjectUrl>
   </PropertyGroup>
 
   <ItemGroup>
@@ -12,6 +18,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ShuitNet.ORM\ShuitNet.ORM.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="README.md">
+      <Pack>True</Pack>
+      <PackagePath>\</PackagePath>
+    </None>
   </ItemGroup>
 
 </Project>

@@ -1,5 +1,6 @@
 using ShuitNet.ORM.Attribute;
 using System;
+using System.Collections;
 using System.Reflection;
 using System.Text;
 using MySql.Data.MySqlClient;
