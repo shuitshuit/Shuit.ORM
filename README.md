@@ -2,6 +2,31 @@
 
 シンプルで軽量なORMライブラリです。PostgreSQLとMySQLに対応しています。
 
+## 目次
+
+- [概要](#概要)
+- [特徴](#特徴)  
+- [インストール](#インストール)
+  - [PostgreSQL版](#postgresql版)
+  - [MySQL版](#mysql版)
+- [使用方法](#使用方法)
+  - [基本的な設定](#基本的な設定)
+  - [データクラスの定義](#データクラスの定義)
+  - [基本的なCRUD操作](#基本的なcrud操作)
+  - [カスタムクエリ](#カスタムクエリ)
+- [属性](#属性)
+  - [KeyAttribute](#keyattribute)
+  - [NameAttribute](#nameattribute)
+  - [IgnoreAttribute](#ignoreattribute)
+  - [SerialAttribute](#serialattribute)
+  - [ForeignKeyAttribute](#foreignkeyattribute)
+  - [MaskAttribute](#maskattribute)
+- [命名規則](#命名規則)
+- [トランザクション](#トランザクション)
+- [ライセンス](#ライセンス)
+- [作者](#作者)
+- [バージョン](#バージョン)
+
 ## 概要
 
 ShuitNet.ORMは、.NET環境でPostgreSQLとMySQLデータベースを簡単に操作するためのObject-Relational Mapping (ORM) ライブラリです。属性ベースの設定により、データクラスとデータベーステーブル間のマッピングを行います。
