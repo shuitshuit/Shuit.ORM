@@ -1,5 +1,7 @@
 # ShuitNet.ORM.PostgreSQL
 
+[![NuGet version](https://badge.fury.io/nu/ShuitNet.ORM.PostgreSQL.svg)](https://badge.fury.io/nu/ShuitNet.ORM.PostgreSQL)
+
 PostgreSQL用のShuitNet.ORMライブラリです。
 
 ## 概要
@@ -11,6 +13,7 @@ ShuitNet.ORM.PostgreSQLは、PostgreSQLデータベースに対応したObject-R
 - **シンプルなAPI**: 直感的で使いやすいメソッド
 - **非同期対応**: async/awaitパターンをサポート
 - **属性ベース設定**: データクラスに属性を付与してマッピング設定
+- **LINQ to SQL**: LINQ式を使用したタイプセーフなクエリ
 - **命名規則の自動変換**: CamelCase, SnakeCase, KebabCase, PascalCaseに対応
 - **外部キー対応**: ForeignKey属性によるリレーション処理
 - **スキーマ対応**: PostgreSQLのスキーマ機能をサポート
@@ -115,6 +118,44 @@ var user = await connection.QueryFirstAsync<User>("SELECT * FROM users WHERE ema
 
 // 非クエリの実行
 await connection.ExecuteAsync("UPDATE users SET last_login = NOW() WHERE id = @id", new { id = 1 });
+```
+
+### LINQ to SQL
+
+LINQ式を使用してタイプセーフなクエリを記述できます：
+
+```csharp
+using ShuitNet.ORM.PostgreSQL.LinqToSql;
+
+// 基本的なクエリ
+var users = await connection.AsQueryable<User>()
+    .Where(u => u.Age > 18)
+    .OrderBy(u => u.Name)
+    .ToListAsync();
+
+// JOIN操作
+var userOrders = await connection.AsQueryable<User>()
+    .Join(connection.AsQueryable<Order>(),
+          u => u.Id,
+          o => o.UserId,
+          (u, o) => new { UserName = u.Name, OrderDate = o.Date })
+    .ToListAsync();
+
+// GROUP BY操作
+var stats = await connection.AsQueryable<User>()
+    .GroupBy(u => u.DepartmentId)
+    .Select(g => new {
+        DepartmentId = g.Key,
+        UserCount = g.Count(),
+        AverageAge = g.Average(u => u.Age)
+    })
+    .ToListAsync();
+
+// 文字列検索
+var searchResults = await connection.AsQueryable<User>()
+    .Where(u => u.Name.Contains("John"))
+    .Where(u => u.Email.EndsWith(".com"))
+    .ToListAsync();
 ```
 
 ### 命名規則

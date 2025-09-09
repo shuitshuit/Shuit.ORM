@@ -9,11 +9,16 @@
     <NeutralLanguage>ja-JP</NeutralLanguage>
     <Title>ShuitNet.ORM.PostgreSQL</Title>
 	<PackageLicenseExpression>MIT</PackageLicenseExpression>
-	<Version>1.2.0</Version>
+	<Version>1.2.1</Version>
 	<GeneratePackageOnBuild>True</GeneratePackageOnBuild>
 	<PackageReadmeFile>README.md</PackageReadmeFile>
-	<RepositoryUrl></RepositoryUrl>
+	<RepositoryUrl>https://github.com/shuitshuit/Shuit.ORM</RepositoryUrl>
 	<PackageProjectUrl>https://github.com/shuitshuit/Shuit.ORM</PackageProjectUrl>
+	<AssemblyVersion>1.2.1</AssemblyVersion>
+	<FileVersion>1.2.1</FileVersion>
+	<Description>シンプルで軽量なPostgreSQL向けORMライブラリ。非同期対応、属性ベース設定、命名規則の自動変換をサポート。</Description>
+	<PackageTags>ORM;PostgreSQL;Database;Async;Attributes</PackageTags>
+	<RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>

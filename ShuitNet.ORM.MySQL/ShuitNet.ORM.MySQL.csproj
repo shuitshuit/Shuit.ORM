@@ -5,11 +5,20 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
-    <Company>shuit.net</Company>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
     <Authors>shuit</Authors>
-    <RepositoryUrl></RepositoryUrl>
+    <Company>$(Authors).net</Company>
+    <NeutralLanguage>ja-JP</NeutralLanguage>
+    <Title>ShuitNet.ORM.MySQL</Title>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <Version>1.2.0</Version>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/shuitshuit/Shuit.ORM</RepositoryUrl>
     <PackageProjectUrl>https://github.com/shuitshuit/Shuit.ORM</PackageProjectUrl>
+    <AssemblyVersion>1.2.0</AssemblyVersion>
+    <FileVersion>1.2.0</FileVersion>
+    <Description>シンプルで軽量なMySQL向けORMライブラリ。非同期対応、属性ベース設定、命名規則の自動変換をサポート。</Description>
+    <PackageTags>ORM;MySQL;Database;Async;Attributes</PackageTags>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>

@@ -6,11 +6,20 @@
     <Nullable>enable</Nullable>
     <GeneratePackageOnBuild>True</GeneratePackageOnBuild>
     <Authors>shuit</Authors>
-    <Company>shuit.net</Company>
+    <Company>$(Authors).net</Company>
+    <NeutralLanguage>ja-JP</NeutralLanguage>
+    <Title>ShuitNet.ORM</Title>
+    <Version>1.2.0</Version>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <RepositoryUrl>https://github.com/shuitshuit/Shuit.ORM</RepositoryUrl>
     <PackageProjectUrl>https://github.com/shuitshuit/Shuit.ORM</PackageProjectUrl>
     <PackageRequireLicenseAcceptance>False</PackageRequireLicenseAcceptance>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <AssemblyVersion>1.2.0</AssemblyVersion>
+    <FileVersion>1.2.0</FileVersion>
+    <Description>シンプルで軽量なORMライブラリのコアコンポーネント。属性ベース設定、命名規則の自動変換をサポート。</Description>
+    <PackageTags>ORM;Database;Attributes;Core</PackageTags>
+    <RepositoryType>git</RepositoryType>
   </PropertyGroup>
 
   <ItemGroup>

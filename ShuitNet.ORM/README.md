@@ -1,5 +1,7 @@
 # ShuitNet.ORM (Core)
 
+[![NuGet version](https://badge.fury.io/nu/ShuitNet.ORM.svg)](https://badge.fury.io/nu/ShuitNet.ORM)
+
 軽量でシンプルなORMライブラリのコアパッケージです。
 
 ## 概要
