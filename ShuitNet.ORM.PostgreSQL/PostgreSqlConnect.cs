@@ -380,6 +380,8 @@ namespace ShuitNet.ORM.PostgreSQL
                 {
                     continue;
                 }
+                if (property.GetValue(instance) == null) // nullの場合は無視する
+                    continue;
 
                 sql += $"\"{GetColumnName<T>(property)}\",";
                 values += $"@{property.Name},";
