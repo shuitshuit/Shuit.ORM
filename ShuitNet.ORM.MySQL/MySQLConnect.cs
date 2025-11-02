@@ -156,7 +156,7 @@ namespace ShuitNet.ORM.MySQL
             await using MySqlCommand command = new(sql, _con);
             foreach (var property in key.GetType().GetProperties())
             {
-                command.Parameters.AddWithValue(property.Name, property.GetValue(key)!);
+                command.Parameters.AddWithValue(property.Name, property.GetValue(key) ?? DBNull.Value);
             }
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -190,7 +190,7 @@ namespace ShuitNet.ORM.MySQL
             await using MySqlCommand command = new(sql, _con);
             foreach (var property in parameter.GetType().GetProperties())
             {
-                command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
             }
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -326,17 +326,44 @@ namespace ShuitNet.ORM.MySQL
                 {
                     continue;
                 }
+
+                var propertyValue = property.GetValue(instance);
                 var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
                 if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
                 {
-                    var propertyValue = property.GetValue(instance);
                     if (propertyValue == null) continue;
                     // 外部キーの場合は値を変換する
                     command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
                 }
                 else
                 {
-                    command.Parameters.AddWithValue(property.Name, property.GetValue(instance)!);
+                    // nullの場合はDBNull.Valueを使用する
+                    if (propertyValue == null)
+                    {
+                        command.Parameters.AddWithValue(property.Name, DBNull.Value);
+                    }
+                    // Enumの場合は文字列名に変換（MySQL ENUM型対応）
+                    else if (property.PropertyType.IsEnum)
+                    {
+                        command.Parameters.AddWithValue(property.Name, propertyValue.ToString()!);
+                    }
+                    // List<T>の場合はJSON文字列に変換
+                    else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
+                    {
+                        var elementType = property.PropertyType.GetGenericArguments()[0];
+                        if (elementType == typeof(string))
+                        {
+                            command.Parameters.AddWithValue(property.Name, System.Text.Json.JsonSerializer.Serialize((IEnumerable<string>)propertyValue));
+                        }
+                        else
+                        {
+                            command.Parameters.AddWithValue(property.Name, propertyValue);
+                        }
+                    }
+                    else
+                    {
+                        command.Parameters.AddWithValue(property.Name, propertyValue);
+                    }
                 }
             }
             command.Parameters.AddWithValue(keyColumnName, typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)!);
@@ -356,7 +383,7 @@ namespace ShuitNet.ORM.MySQL
                 {
                     foreach (var kvp in dict)
                     {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value);
+                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
                     }
                 }
                 else
@@ -364,7 +391,7 @@ namespace ShuitNet.ORM.MySQL
                     // 通常のオブジェクトの場合
                     foreach (var property in parameter.GetType().GetProperties())
                     {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
                     }
                 }
                 return await command.ExecuteNonQueryAsync();
@@ -409,17 +436,41 @@ namespace ShuitNet.ORM.MySQL
                 if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
                     property.GetCustomAttribute<SerialAttribute>() != null)
                     continue;
+
+                var propertyValue = property.GetValue(instance);
+                if (propertyValue == null) continue; // nullの場合は無視する
+
                 var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
                 if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
                 {
-                    var propertyValue = property.GetValue(instance);
-                    if (propertyValue == null) continue;
                     // 外部キーの場合は値を変換する
                     command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
                 }
                 else
                 {
-                    command.Parameters.AddWithValue(property.Name, property.GetValue(instance)!);
+                    // Enumの場合は文字列名に変換（MySQL ENUM型対応）
+                    if (property.PropertyType.IsEnum)
+                    {
+                        command.Parameters.AddWithValue(property.Name, propertyValue.ToString()!);
+                    }
+                    // List<T>の場合は配列に変換またはJSON文字列に変換
+                    else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
+                    {
+                        var elementType = property.PropertyType.GetGenericArguments()[0];
+                        if (elementType == typeof(string))
+                        {
+                            // MySQLの場合はJSON文字列として保存
+                            command.Parameters.AddWithValue(property.Name, System.Text.Json.JsonSerializer.Serialize((IEnumerable<string>)propertyValue));
+                        }
+                        else
+                        {
+                            command.Parameters.AddWithValue(property.Name, propertyValue);
+                        }
+                    }
+                    else
+                    {
+                        command.Parameters.AddWithValue(property.Name, propertyValue);
+                    }
                 }
             }
             return await command.ExecuteNonQueryAsync();
@@ -437,7 +488,7 @@ namespace ShuitNet.ORM.MySQL
                 {
                     foreach (var kvp in dict)
                     {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value);
+                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
                     }
                 }
                 else
@@ -445,7 +496,7 @@ namespace ShuitNet.ORM.MySQL
                     // 通常のオブジェクトの場合
                     foreach (var property in parameter.GetType().GetProperties())
                     {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
                     }
                 }
             }
@@ -480,7 +531,7 @@ namespace ShuitNet.ORM.MySQL
                 {
                     foreach (var kvp in dict)
                     {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value);
+                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
                     }
                 }
                 else
@@ -488,7 +539,7 @@ namespace ShuitNet.ORM.MySQL
                     // 通常のオブジェクトの場合
                     foreach (var property in parameter.GetType().GetProperties())
                     {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
                     }
                 }
             }
@@ -911,9 +962,50 @@ namespace ShuitNet.ORM.MySQL
             else
             {
                 if (value is DBNull)
+                {
                     property.SetValue(instance, null);
+                }
+                // Enumの場合は文字列からEnumに変換（MySQL ENUM型対応）
+                else if (property.PropertyType.IsEnum)
+                {
+                    if (value is string stringValue)
+                    {
+                        property.SetValue(instance, Enum.Parse(property.PropertyType, stringValue, ignoreCase: true));
+                    }
+                    else if (value is int intValue)
+                    {
+                        property.SetValue(instance, Enum.ToObject(property.PropertyType, intValue));
+                    }
+                    else
+                    {
+                        property.SetValue(instance, Enum.Parse(property.PropertyType, value.ToString()!, ignoreCase: true));
+                    }
+                }
+                // List<string>の場合はJSON文字列からListに変換
+                else if (property.PropertyType.IsGenericType && property.PropertyType.GetGenericTypeDefinition() == typeof(List<>))
+                {
+                    var elementType = property.PropertyType.GetGenericArguments()[0];
+                    if (elementType == typeof(string) && value is string jsonString)
+                    {
+                        try
+                        {
+                            var list = System.Text.Json.JsonSerializer.Deserialize<List<string>>(jsonString);
+                            property.SetValue(instance, list ?? new List<string>());
+                        }
+                        catch
+                        {
+                            property.SetValue(instance, new List<string>());
+                        }
+                    }
+                    else
+                    {
+                        property.SetValue(instance, value);
+                    }
+                }
                 else
+                {
                     property.SetValue(instance, value);
+                }
             }
         }
     }
