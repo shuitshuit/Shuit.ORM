@@ -55,6 +55,10 @@ namespace ShuitNet.ORM.PostgreSQL.LinqToSql
                 case ExpressionType.Call:
                     VisitMethodCall((MethodCallExpression)expression);
                     break;
+                case ExpressionType.Convert:
+                case ExpressionType.ConvertChecked:
+                    VisitConvert((UnaryExpression)expression);
+                    break;
                 default:
                     throw new NotSupportedException($"Expression type {expression.NodeType} is not supported");
             }
@@ -99,6 +103,12 @@ namespace ShuitNet.ORM.PostgreSQL.LinqToSql
         private void VisitParameter(ParameterExpression parameter)
         {
             // パラメータ名は通常使用されない（メンバーアクセス時に処理される）
+        }
+
+        private void VisitConvert(UnaryExpression unary)
+        {
+            // 型変換は無視して内部の式を処理
+            Visit(unary.Operand);
         }
 
         private void VisitMethodCall(MethodCallExpression methodCall)

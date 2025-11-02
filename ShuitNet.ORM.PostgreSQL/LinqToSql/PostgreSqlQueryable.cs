@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ShuitNet.ORM.PostgreSQL.LinqToSql
 {
-    public class PostgreSqlQueryable<T> : IQueryable<T>
+    public class PostgreSqlQueryable<T> : IOrderedQueryable<T>
     {
         private readonly PostgreSqlConnect _connection;
         private readonly Expression _expression;
