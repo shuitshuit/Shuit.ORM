@@ -350,9 +350,22 @@ namespace ShuitNet.ORM.MySQL
                 await using MySqlCommand command = new(sql, _con);
                 if (parameter == null)
                     return await command.ExecuteNonQueryAsync();
-                foreach (var property in parameter.GetType().GetProperties())
+
+                // Dictionary<string, object>の場合
+                if (parameter is IDictionary<string, object> dict)
                 {
-                    command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                    foreach (var kvp in dict)
+                    {
+                        command.Parameters.AddWithValue(kvp.Key, kvp.Value);
+                    }
+                }
+                else
+                {
+                    // 通常のオブジェクトの場合
+                    foreach (var property in parameter.GetType().GetProperties())
+                    {
+                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                    }
                 }
                 return await command.ExecuteNonQueryAsync();
             }
@@ -419,9 +432,21 @@ namespace ShuitNet.ORM.MySQL
             await using MySqlCommand command = new(sql, _con);
             if (parameter != null)
             {
-                foreach (var property in parameter.GetType().GetProperties())
+                // Dictionary<string, object>の場合
+                if (parameter is IDictionary<string, object> dict)
                 {
-                    command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                    foreach (var kvp in dict)
+                    {
+                        command.Parameters.AddWithValue(kvp.Key, kvp.Value);
+                    }
+                }
+                else
+                {
+                    // 通常のオブジェクトの場合
+                    foreach (var property in parameter.GetType().GetProperties())
+                    {
+                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                    }
                 }
             }
 
@@ -450,9 +475,21 @@ namespace ShuitNet.ORM.MySQL
             await using MySqlCommand command = new(sql, _con);
             if (parameter != null)
             {
-                foreach (var property in parameter.GetType().GetProperties())
+                // Dictionary<string, object>の場合
+                if (parameter is IDictionary<string, object> dict)
                 {
-                    command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                    foreach (var kvp in dict)
+                    {
+                        command.Parameters.AddWithValue(kvp.Key, kvp.Value);
+                    }
+                }
+                else
+                {
+                    // 通常のオブジェクトの場合
+                    foreach (var property in parameter.GetType().GetProperties())
+                    {
+                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter)!);
+                    }
                 }
             }
 

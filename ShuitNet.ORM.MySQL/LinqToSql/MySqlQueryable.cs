@@ -7,7 +7,7 @@ using System.Threading.Tasks;
 
 namespace ShuitNet.ORM.MySQL.LinqToSql
 {
-    public class MySqlQueryable<T> : IQueryable<T>
+    public class MySqlQueryable<T> : IOrderedQueryable<T>
     {
         private readonly MySQLConnect _connection;
         private readonly Expression _expression;
