@@ -26,7 +26,6 @@ jobs:
       - name: Restore (exclude ShuitNet.ORM.Test)
         shell: bash
         run: |
-          # リポジトリ内の *.csproj をすべて restore するが、テストプロジェクトを除外する
           find . -name "*.csproj" -not -path "./.git/*" -not -path "./ShuitNet.ORM.Test/*" -print0 | xargs -0 -n1 dotnet restore
 
       - name: Calculate new version (patch bump from latest tag vMAJOR.MINOR.PATCH)
@@ -42,16 +41,13 @@ jobs:
           echo "Latest tag: $latest_tag"
           echo "new_version=$new_version" >> $GITHUB_OUTPUT
 
-      - name: Build
-        run: dotnet build --configuration Release
-
       - name: Pack all projects
         shell: bash
         run: |
           mkdir -p ./artifacts
           VERSION="${{ steps.ver.outputs.new_version }}"
           echo "Packing with Version=${VERSION}"
-          find . -name "*.csproj" -not -path "./.git/*" | while read -r proj; do
+          find . -name "*.csproj" -not -path "./.git/*" -not -path "./ShuitNet.ORM.Test/*" | while read -r proj; do
             echo "Packing $proj"
             dotnet pack "$proj" -c Release -o ./artifacts /p:Version="$VERSION"
           done
