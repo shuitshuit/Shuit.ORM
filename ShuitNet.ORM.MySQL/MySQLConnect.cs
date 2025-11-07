@@ -4,6 +4,7 @@ using System.Collections;
 using System.Reflection;
 using System.Text;
 using MySql.Data.MySqlClient;
+using ShuitNet.ORM.MySQL.LinqToSql;
 using ForeignKeyAttribute = ShuitNet.ORM.Attribute.ForeignKeyAttribute;
 using KeyAttribute = ShuitNet.ORM.Attribute.KeyAttribute;
 
@@ -568,6 +569,55 @@ namespace ShuitNet.ORM.MySQL
         }
 
         public T QueryFirst<T>(string sql, object? parameter = null) => QueryFirstAsync<T>(sql, parameter).Result;
+
+        /// <summary>
+        /// Execute a SQL query and return a single scalar value
+        /// </summary>
+        /// <typeparam name="T">The type of the scalar value</typeparam>
+        /// <param name="sql">SQL query</param>
+        /// <param name="parameter">Parameters</param>
+        /// <returns>Scalar value</returns>
+        public async Task<T> ExecuteScalarAsync<T>(string sql, object? parameter = null)
+        {
+            await using MySqlCommand command = new(sql, _con);
+            if (parameter != null)
+            {
+                // Dictionary<string, object>の場合
+                if (parameter is IDictionary<string, object> dict)
+                {
+                    foreach (var kvp in dict)
+                    {
+                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
+                    }
+                }
+                else
+                {
+                    // 通常のオブジェクトの場合
+                    foreach (var property in parameter.GetType().GetProperties())
+                    {
+                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
+                    }
+                }
+            }
+
+            var result = await command.ExecuteScalarAsync();
+            if (result == null || result is DBNull)
+                return default(T)!;
+
+            return (T)Convert.ChangeType(result, typeof(T));
+        }
+
+        public T ExecuteScalar<T>(string sql, object? parameter = null) => ExecuteScalarAsync<T>(sql, parameter).Result;
+
+        /// <summary>
+        /// Create a LINQ queryable interface for the specified type
+        /// </summary>
+        /// <typeparam name="T">Data class</typeparam>
+        /// <returns>IQueryable interface for LINQ operations</returns>
+        public MySqlQueryable<T> AsQueryable<T>()
+        {
+            return new MySqlQueryable<T>(this);
+        }
 
         /// <summary>
         /// Refer to <see cref="NameAttribute"/>. If not assigned, the class name is converted to a snake case.

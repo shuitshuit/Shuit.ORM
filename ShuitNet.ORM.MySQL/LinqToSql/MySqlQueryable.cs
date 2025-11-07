@@ -68,15 +68,15 @@ namespace ShuitNet.ORM.MySQL.LinqToSql
         {
             var tableName = MySQLConnect.GetTableName<T>();
             var whereClause = _provider.BuildWhereClause<T>(_expression);
-            
+
             var countQuery = $"SELECT COUNT(*) FROM {tableName}";
             if (!string.IsNullOrEmpty(whereClause.WhereClause))
             {
                 countQuery += $" WHERE {whereClause.WhereClause}";
             }
 
-            var results = await _connection.QueryAsync<int>(countQuery, whereClause.Parameters);
-            return results.First();
+            var count = await _connection.ExecuteScalarAsync<long>(countQuery, whereClause.Parameters);
+            return (int)count;
         }
 
         public async Task<bool> AnyAsync()

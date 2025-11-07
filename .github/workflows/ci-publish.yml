@@ -1,0 +1,81 @@
+name: CI - Pack and Publish to NuGet
+
+on:
+  push:
+    branches: [ "master" ]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore
+        run: dotnet restore
+
+      - name: Calculate new version (patch bump from latest tag vMAJOR.MINOR.PATCH)
+        id: ver
+        shell: bash
+        run: |
+          git fetch --tags
+          latest_tag=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          ver=${latest_tag#v}
+          IFS='.' read -r major minor patch <<< "$ver"
+          patch=$((patch + 1))
+          new_version="${major}.${minor}.${patch}"
+          echo "Latest tag: $latest_tag"
+          echo "new_version=$new_version" >> $GITHUB_OUTPUT
+
+      - name: Build
+        run: dotnet build --configuration Release
+
+      - name: Pack all projects
+        shell: bash
+        run: |
+          mkdir -p ./artifacts
+          VERSION="${{ steps.ver.outputs.new_version }}"
+          echo "Packing with Version=${VERSION}"
+          # pack each csproj (adjust if you have a solution to pack instead)
+          find . -name "*.csproj" -not -path "./.git/*" | while read -r proj; do
+            echo "Packing $proj"
+            dotnet pack "$proj" -c Release -o ./artifacts /p:Version="$VERSION"
+          done
+
+      - name: Publish to NuGet
+        env:
+          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+        shell: bash
+        run: |
+          if [ -z "$(ls -A ./artifacts 2>/dev/null)" ]; then
+            echo "No packages to publish"
+            exit 0
+          fi
+          for nupkg in ./artifacts/*.nupkg; do
+            echo "Publishing $nupkg"
+            dotnet nuget push "$nupkg" -k "$NUGET_API_KEY" -s https://api.nuget.org/v3/index.json --skip-duplicate
+          done
+
+      - name: Create and push tag (optional)
+        if: success()
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          new_tag="v${{ steps.ver.outputs.new_version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "$new_tag" || echo "tag $new_tag already exists"
+          git push origin "$new_tag" || echo "tag push failed or already pushed"

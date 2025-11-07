@@ -34,9 +34,36 @@ namespace ShuitNet.ORM.MySQL.LinqToSql
 
         public TResult Execute<TResult>(Expression expression)
         {
+            // Count()メソッドの場合は特別な処理
+            if (expression is MethodCallExpression methodCall && methodCall.Method.Name == "Count")
+            {
+                var elementType = methodCall.Method.GetGenericArguments().Length > 0
+                    ? methodCall.Method.GetGenericArguments()[0]
+                    : methodCall.Arguments[0].Type.GetGenericArguments()[0];
+
+                var tableName = (string)typeof(MySQLConnect)
+                    .GetMethod("GetTableName")!
+                    .MakeGenericMethod(elementType)
+                    .Invoke(null, null)!;
+
+                var whereClause = (SqlResult)GetType()
+                    .GetMethod("BuildWhereClause")!
+                    .MakeGenericMethod(elementType)
+                    .Invoke(this, new object[] { methodCall.Arguments[0] })!;
+
+                var countQuery = $"SELECT COUNT(*) FROM {tableName}";
+                if (!string.IsNullOrEmpty(whereClause.WhereClause))
+                {
+                    countQuery += $" WHERE {whereClause.WhereClause}";
+                }
+
+                var count = _connection.ExecuteScalar<long>(countQuery, whereClause.Parameters);
+                return (TResult)(object)(int)count;
+            }
+
             var sql = BuildSql<TResult>(expression);
-            var results = _connection.Query<TResult>(sql.Query, sql.Parameters);
-            return results.First();
+            var results2 = _connection.Query<TResult>(sql.Query, sql.Parameters);
+            return results2.First();
         }
 
         public SqlResult BuildSql<T>(Expression expression)

@@ -71,8 +71,46 @@ namespace ShuitNet.ORM.PostgreSQL.LinqToSql
 
         private void VisitMemberAccess(MemberExpression memberExpression)
         {
-            var columnName = GetColumnName(memberExpression.Member);
-            _sql.Append($"\"{columnName}\"");
+            // メンバーアクセスの対象がラムダパラメータの場合、カラムとして扱う
+            if (memberExpression.Expression is ParameterExpression)
+            {
+                var columnName = GetColumnName(memberExpression.Member);
+                _sql.Append($"\"{columnName}\"");
+            }
+            else
+            {
+                // それ以外の場合は外部変数として評価し、値を取得
+                var value = GetMemberValue(memberExpression);
+                var paramName = $"@p{_parameterIndex++}";
+                _parameters.Add(paramName, value!);
+                _sql.Append(paramName);
+            }
+        }
+
+        private static object? GetMemberValue(MemberExpression memberExpression)
+        {
+            // メンバーアクセスの式を評価して値を取得
+            var objectMember = Expression.Convert(memberExpression, typeof(object));
+            var getterLambda = Expression.Lambda<Func<object>>(objectMember);
+            var getter = getterLambda.Compile();
+            return getter();
+        }
+
+        private static object? GetExpressionValue(Expression expression)
+        {
+            // 定数式の場合は直接値を返す
+            if (expression is ConstantExpression constExpr)
+                return constExpr.Value;
+
+            // メンバーアクセスでラムダパラメータでない場合は評価
+            if (expression is MemberExpression memberExpr && memberExpr.Expression is not ParameterExpression)
+                return GetMemberValue(memberExpr);
+
+            // その他の式は評価する
+            var objectMember = Expression.Convert(expression, typeof(object));
+            var getterLambda = Expression.Lambda<Func<object>>(objectMember);
+            var getter = getterLambda.Compile();
+            return getter();
         }
 
         private void VisitBinary(BinaryExpression binary)
@@ -117,41 +155,35 @@ namespace ShuitNet.ORM.PostgreSQL.LinqToSql
             {
                 Visit(methodCall.Object!);
                 _sql.Append(" LIKE ");
-                
-                // Contains の引数を取得
+
+                // Contains の引数を取得して評価
                 var argument = methodCall.Arguments[0];
-                if (argument is ConstantExpression constExpr)
-                {
-                    var paramName = $"@p{_parameterIndex++}";
-                    _parameters.Add(paramName, $"%{constExpr.Value}%");
-                    _sql.Append(paramName);
-                }
+                var value = GetExpressionValue(argument);
+                var paramName = $"@p{_parameterIndex++}";
+                _parameters.Add(paramName, $"%{value}%");
+                _sql.Append(paramName);
             }
             else if (methodCall.Method.Name == "StartsWith" && methodCall.Method.DeclaringType == typeof(string))
             {
                 Visit(methodCall.Object!);
                 _sql.Append(" LIKE ");
-                
+
                 var argument = methodCall.Arguments[0];
-                if (argument is ConstantExpression constExpr)
-                {
-                    var paramName = $"@p{_parameterIndex++}";
-                    _parameters.Add(paramName, $"{constExpr.Value}%");
-                    _sql.Append(paramName);
-                }
+                var value = GetExpressionValue(argument);
+                var paramName = $"@p{_parameterIndex++}";
+                _parameters.Add(paramName, $"{value}%");
+                _sql.Append(paramName);
             }
             else if (methodCall.Method.Name == "EndsWith" && methodCall.Method.DeclaringType == typeof(string))
             {
                 Visit(methodCall.Object!);
                 _sql.Append(" LIKE ");
-                
+
                 var argument = methodCall.Arguments[0];
-                if (argument is ConstantExpression constExpr)
-                {
-                    var paramName = $"@p{_parameterIndex++}";
-                    _parameters.Add(paramName, $"%{constExpr.Value}");
-                    _sql.Append(paramName);
-                }
+                var value = GetExpressionValue(argument);
+                var paramName = $"@p{_parameterIndex++}";
+                _parameters.Add(paramName, $"%{value}");
+                _sql.Append(paramName);
             }
             else
             {
