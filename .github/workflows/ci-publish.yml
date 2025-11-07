@@ -41,6 +41,14 @@ jobs:
           echo "Latest tag: $latest_tag"
           echo "new_version=$new_version" >> $GITHUB_OUTPUT
 
+      - name: Build (exclude ShuitNet.ORM.Test)
+        shell: bash
+        run: |
+          find . -name "*.csproj" -not -path "./.git/*" -not -path "./ShuitNet.ORM.Test/*" | while read -r proj; do
+            echo "Building $proj"
+            dotnet build "$proj" -c Release
+          done
+
       - name: Pack all projects
         shell: bash
         run: |
@@ -49,7 +57,7 @@ jobs:
           echo "Packing with Version=${VERSION}"
           find . -name "*.csproj" -not -path "./.git/*" -not -path "./ShuitNet.ORM.Test/*" | while read -r proj; do
             echo "Packing $proj"
-            dotnet pack "$proj" -c Release -o ./artifacts /p:Version="$VERSION"
+            dotnet pack "$proj" -c Release --no-build -o ./artifacts /p:Version="$VERSION"
           done
 
       - name: Publish to NuGet
