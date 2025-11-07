@@ -117,9 +117,10 @@ namespace ShuitNet.ORM.PostgreSQL
             var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
             for (var i = 0; i < reader.FieldCount; i++)
             {
+                string fieldName = reader.GetName(i);
                 // カラム名からプロパティ名を取得
-                var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                    ?? throw new InvalidOperationException("Property not found.");
+                var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                    ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                 var value = reader.GetValue(i);
                 SetValue(property, ref instance, value);
             }
@@ -169,9 +170,10 @@ namespace ShuitNet.ORM.PostgreSQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    string fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -202,9 +204,10 @@ namespace ShuitNet.ORM.PostgreSQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    string fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -233,9 +236,10 @@ namespace ShuitNet.ORM.PostgreSQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    var fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = type.GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = type.GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -246,6 +250,7 @@ namespace ShuitNet.ORM.PostgreSQL
         }
 
         public IEnumerable<T> GetAll<T>(Func<T, bool> func) => GetAllAsync(func).Result;
+
         public async Task<IEnumerable<T>> GetAllAsync<T>()
         {
             var type = typeof(T);
@@ -259,9 +264,10 @@ namespace ShuitNet.ORM.PostgreSQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    var fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = type.GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = type.GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -316,8 +322,10 @@ namespace ShuitNet.ORM.PostgreSQL
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"UPDATE {tableName} SET ";
             sql = typeof(T).GetProperties()
-                .Where(property => property.GetCustomAttribute<IgnoreAttribute>() == null && property.GetCustomAttribute<SerialAttribute>() == null)
-                .Aggregate(sql, (current, property) => current + $"\"{GetColumnName<T>(property)}\" = @{property.Name},");
+                .Where(property => property.GetCustomAttribute<IgnoreAttribute>() == null &&
+                    property.GetCustomAttribute<SerialAttribute>() == null)
+                .Aggregate(sql, (current, property) =>
+                    current + $"\"{GetColumnName<T>(property)}\" = @{property.Name},");
             sql = sql[..^1] + $" WHERE \"{keyColumnName}\" = @{keyColumnName}";
 
             await using NpgsqlCommand command = new(sql, _con);
@@ -409,6 +417,7 @@ namespace ShuitNet.ORM.PostgreSQL
         }
 
         public int Execute(string sql, object? parameter = null) => ExecuteAsync(sql, parameter).Result;
+
         public async Task<int> InsertAsync<T>(T instance)
         {
             if (instance == null)
@@ -515,9 +524,10 @@ namespace ShuitNet.ORM.PostgreSQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    string fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -557,9 +567,10 @@ namespace ShuitNet.ORM.PostgreSQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    string fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -688,7 +699,7 @@ namespace ShuitNet.ORM.PostgreSQL
                         return property.Name;
                 }
             }
-            throw new ArgumentException("Property not found.");
+            throw new ArgumentException($"No property matching {columnName} was found.");
         }
 
         private static object SetForeignKeyData(PropertyInfo info, object value)

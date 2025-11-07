@@ -114,9 +114,10 @@ namespace ShuitNet.ORM.MySQL
             var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
             for (var i = 0; i < reader.FieldCount; i++)
             {
+                string fieldName = reader.GetName(i);
                 // カラム名からプロパティ名を取得
-                var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                    ?? throw new InvalidOperationException("Property not found.");
+                var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                    ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                 var value = reader.GetValue(i);
                 SetValue(property, ref instance, value);
             }
@@ -166,9 +167,10 @@ namespace ShuitNet.ORM.MySQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    string fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -199,9 +201,10 @@ namespace ShuitNet.ORM.MySQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    string fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -230,8 +233,9 @@ namespace ShuitNet.ORM.MySQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    var fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = type.GetProperty(GetPropertyName<T>(reader.GetName(i)))
+                    var property = type.GetProperty(GetPropertyName<T>(fieldName))
                         ?? throw new InvalidOperationException("Property not found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
@@ -257,9 +261,10 @@ namespace ShuitNet.ORM.MySQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    var fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = type.GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = type.GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -508,9 +513,10 @@ namespace ShuitNet.ORM.MySQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    string fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -550,9 +556,10 @@ namespace ShuitNet.ORM.MySQL
                 var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
                 for (var i = 0; i < reader.FieldCount; i++)
                 {
+                    string fieldName = reader.GetName(i);
                     // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(reader.GetName(i)))
-                        ?? throw new InvalidOperationException("Property not found.");
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
                     var value = reader.GetValue(i);
                     SetValue(property, ref instance, value);
                 }
@@ -681,7 +688,7 @@ namespace ShuitNet.ORM.MySQL
                         return property.Name;
                 }
             }
-            throw new ArgumentException("Property not found.");
+            throw new ArgumentException($"No property matching {columnName} was found.");
         }
 
         private static object SetForeignKeyData(PropertyInfo info, object value)
