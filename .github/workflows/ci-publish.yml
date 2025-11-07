@@ -74,24 +74,14 @@ jobs:
             dotnet nuget push "$nupkg" -k "$NUGET_API_KEY" -s https://api.nuget.org/v3/index.json --skip-duplicate
           done
 
-      - name: Create and push tags (version + latest)
+      - name: Create and push version tag
         if: success()
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         shell: bash
         run: |
-          # 設定
           new_tag="v${{ steps.ver.outputs.new_version }}"
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-
-          # バージョンタグを作成（既に存在していれば無視）
           git tag "$new_tag" || echo "tag $new_tag already exists"
-
-          # `latest` タグは常に最新コミットを指すように強制更新する
-          # GITHUB_SHA を明示して最新コミットにタグを付与
-          git tag -f latest "${GITHUB_SHA}"
-
-          # プッシュ：バージョンタグは通常のプッシュ、latest は強制プッシュで上書き
           git push origin "$new_tag" || echo "tag push failed or already pushed"
-          git push -f origin latest || echo "force push of 'latest' failed"
