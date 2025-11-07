@@ -23,8 +23,11 @@ jobs:
         with:
           dotnet-version: '8.0.x'
 
-      - name: Restore
-        run: dotnet restore
+      - name: Restore (exclude ShuitNet.ORM.Test)
+        shell: bash
+        run: |
+          # リポジトリ内の *.csproj をすべて restore するが、テストプロジェクトを除外する
+          find . -name "*.csproj" -not -path "./.git/*" -not -path "./ShuitNet.ORM.Test/*" -print0 | xargs -0 -n1 dotnet restore
 
       - name: Calculate new version (patch bump from latest tag vMAJOR.MINOR.PATCH)
         id: ver
@@ -48,7 +51,6 @@ jobs:
           mkdir -p ./artifacts
           VERSION="${{ steps.ver.outputs.new_version }}"
           echo "Packing with Version=${VERSION}"
-          # pack each csproj (adjust if you have a solution to pack instead)
           find . -name "*.csproj" -not -path "./.git/*" | while read -r proj; do
             echo "Packing $proj"
             dotnet pack "$proj" -c Release -o ./artifacts /p:Version="$VERSION"
