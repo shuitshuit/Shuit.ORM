@@ -8,6 +8,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 
@@ -353,6 +354,26 @@ namespace ShuitNet.ORM.PostgreSQL
                     {
                         command.Parameters.AddWithValue(property.Name, DBNull.Value);
                     }
+                    // JSONB型の場合はJSONシリアライズ
+                    else if (property.GetCustomAttribute<JsonbAttribute>() != null)
+                    {
+                        var json = JsonSerializer.Serialize(propertyValue);
+                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Jsonb)
+                        {
+                            Value = json
+                        };
+                        command.Parameters.Add(param);
+                    }
+                    // JSON型の場合はJSONシリアライズ
+                    else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                    {
+                        var json = JsonSerializer.Serialize(propertyValue);
+                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Json)
+                        {
+                            Value = json
+                        };
+                        command.Parameters.Add(param);
+                    }
                     // Enumの場合は文字列名に変換してUnknown型として設定（PostgreSQL ENUM型対応）
                     else if (property.PropertyType.IsEnum)
                     {
@@ -462,8 +483,28 @@ namespace ShuitNet.ORM.PostgreSQL
                 }
                 else
                 {
+                    // JSONB型の場合はJSONシリアライズ
+                    if (property.GetCustomAttribute<JsonbAttribute>() != null)
+                    {
+                        var json = JsonSerializer.Serialize(propertyValue);
+                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Jsonb)
+                        {
+                            Value = json
+                        };
+                        command.Parameters.Add(param);
+                    }
+                    // JSON型の場合はJSONシリアライズ
+                    else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                    {
+                        var json = JsonSerializer.Serialize(propertyValue);
+                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Json)
+                        {
+                            Value = json
+                        };
+                        command.Parameters.Add(param);
+                    }
                     // Enumの場合は文字列名に変換してUnknown型として設定（PostgreSQL ENUM型対応）
-                    if (property.PropertyType.IsEnum)
+                    else if (property.PropertyType.IsEnum)
                     {
                         var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Unknown)
                         {
@@ -1032,6 +1073,20 @@ namespace ShuitNet.ORM.PostgreSQL
                 if (value is DBNull)
                 {
                     property.SetValue(instance, null);
+                }
+                // JSONB型の場合はJSONデシリアライズ
+                else if (property.GetCustomAttribute<JsonbAttribute>() != null)
+                {
+                    var jsonString = value.ToString()!;
+                    var deserializedValue = JsonSerializer.Deserialize(jsonString, property.PropertyType);
+                    property.SetValue(instance, deserializedValue);
+                }
+                // JSON型の場合はJSONデシリアライズ
+                else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                {
+                    var jsonString = value.ToString()!;
+                    var deserializedValue = JsonSerializer.Deserialize(jsonString, property.PropertyType);
+                    property.SetValue(instance, deserializedValue);
                 }
                 // Enumの場合は文字列からEnumに変換（PostgreSQL ENUM型対応）
                 else if (property.PropertyType.IsEnum)

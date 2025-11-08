@@ -3,6 +3,7 @@ using System;
 using System.Collections;
 using System.Reflection;
 using System.Text;
+using System.Text.Json;
 using MySql.Data.MySqlClient;
 using ShuitNet.ORM.MySQL.LinqToSql;
 using ForeignKeyAttribute = ShuitNet.ORM.Attribute.ForeignKeyAttribute;
@@ -348,6 +349,12 @@ namespace ShuitNet.ORM.MySQL
                     {
                         command.Parameters.AddWithValue(property.Name, DBNull.Value);
                     }
+                    // JSON型の場合はJSONシリアライズ (MySQLではJSON型にマッピング)
+                    else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                    {
+                        var json = JsonSerializer.Serialize(propertyValue);
+                        command.Parameters.AddWithValue(property.Name, json);
+                    }
                     // Enumの場合は文字列名に変換（MySQL ENUM型対応）
                     else if (property.PropertyType.IsEnum)
                     {
@@ -454,8 +461,14 @@ namespace ShuitNet.ORM.MySQL
                 }
                 else
                 {
+                    // JSON型の場合はJSONシリアライズ (MySQLではJSON型にマッピング)
+                    if (property.GetCustomAttribute<JsonAttribute>() != null)
+                    {
+                        var json = JsonSerializer.Serialize(propertyValue);
+                        command.Parameters.AddWithValue(property.Name, json);
+                    }
                     // Enumの場合は文字列名に変換（MySQL ENUM型対応）
-                    if (property.PropertyType.IsEnum)
+                    else if (property.PropertyType.IsEnum)
                     {
                         command.Parameters.AddWithValue(property.Name, propertyValue.ToString()!);
                     }
@@ -1021,6 +1034,13 @@ namespace ShuitNet.ORM.MySQL
                 if (value is DBNull)
                 {
                     property.SetValue(instance, null);
+                }
+                // JSON型の場合はJSONデシリアライズ (MySQLではJSON型から読み取り)
+                else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                {
+                    var jsonString = value.ToString()!;
+                    var deserializedValue = JsonSerializer.Deserialize(jsonString, property.PropertyType);
+                    property.SetValue(instance, deserializedValue);
                 }
                 // Enumの場合は文字列からEnumに変換（MySQL ENUM型対応）
                 else if (property.PropertyType.IsEnum)
