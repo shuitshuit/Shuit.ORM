@@ -961,19 +961,93 @@ namespace ShuitNet.ORM.PostgreSQL
             if (value == null || value is DBNull)
             {
                 command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                return;
             }
-            else if (value is Guid guidValue)
+
+            // Guid型は明示的にUuid型を指定
+            if (value is Guid guidValue)
             {
-                // Guid型は明示的にUuid型を指定
                 command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Uuid) { Value = guidValue });
             }
             else if (value.GetType() == typeof(Guid?))
             {
-                // Nullable<Guid>型も明示的にUuid型を指定
                 var nullableGuid = (Guid?)value;
                 if (nullableGuid.HasValue)
                 {
                     command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Uuid) { Value = nullableGuid.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // DateTime型は明示的にTimestamp型を指定
+            else if (value is DateTime dateTimeValue)
+            {
+                command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Timestamp) { Value = dateTimeValue });
+            }
+            else if (value.GetType() == typeof(DateTime?))
+            {
+                var nullableDateTime = (DateTime?)value;
+                if (nullableDateTime.HasValue)
+                {
+                    command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Timestamp) { Value = nullableDateTime.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // DateTimeOffset型は明示的にTimestampTz型を指定
+            else if (value is DateTimeOffset dateTimeOffsetValue)
+            {
+                command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.TimestampTz) { Value = dateTimeOffsetValue });
+            }
+            else if (value.GetType() == typeof(DateTimeOffset?))
+            {
+                var nullableDateTimeOffset = (DateTimeOffset?)value;
+                if (nullableDateTimeOffset.HasValue)
+                {
+                    command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.TimestampTz) { Value = nullableDateTimeOffset.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // byte[]型は明示的にBytea型を指定
+            else if (value is byte[] byteArrayValue)
+            {
+                command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Bytea) { Value = byteArrayValue });
+            }
+            // TimeSpan型は明示的にInterval型を指定
+            else if (value is TimeSpan timeSpanValue)
+            {
+                command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Interval) { Value = timeSpanValue });
+            }
+            else if (value.GetType() == typeof(TimeSpan?))
+            {
+                var nullableTimeSpan = (TimeSpan?)value;
+                if (nullableTimeSpan.HasValue)
+                {
+                    command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Interval) { Value = nullableTimeSpan.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // bool型は明示的にBoolean型を指定
+            else if (value is bool boolValue)
+            {
+                command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Boolean) { Value = boolValue });
+            }
+            else if (value.GetType() == typeof(bool?))
+            {
+                var nullableBool = (bool?)value;
+                if (nullableBool.HasValue)
+                {
+                    command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Boolean) { Value = nullableBool.Value });
                 }
                 else
                 {

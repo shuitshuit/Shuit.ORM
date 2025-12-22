@@ -9,15 +9,18 @@
 ## 目次
 
 - [概要](#概要)
-- [特徴](#特徴)  
+- [特徴](#特徴)
 - [インストール](#インストール)
   - [PostgreSQL版](#postgresql版)
   - [MySQL版](#mysql版)
 - [使用方法](#使用方法)
   - [基本的な設定](#基本的な設定)
   - [データクラスの定義](#データクラスの定義)
+    - [サポートされている型](#サポートされている型)
+    - [Guid型とstring型の相互変換](#guid型とstring型の相互変換)
   - [基本的なCRUD操作](#基本的なcrud操作)
   - [カスタムクエリ](#カスタムクエリ)
+  - [LINQ to SQL](#linq-to-sql)
 - [属性](#属性)
   - [KeyAttribute](#keyattribute)
   - [NameAttribute](#nameattribute)
@@ -45,6 +48,8 @@ ShuitNet.ORMは、.NET環境でPostgreSQLとMySQLデータベースを簡単に�
 - **外部キー対応**: ForeignKey属性によるリレーション処理
 - **マスキング機能**: データの自動マスキング処理
 - **複数データベース対応**: PostgreSQLとMySQLをサポート
+- **豊富な型サポート**: Guid, DateTime, DateTimeOffset, byte[], TimeSpan, bool, decimalなどの型を明示的にサポート
+- **型の自動変換**: Guid ⟷ string の相互変換をサポート
 
 ## インストール
 
@@ -89,16 +94,61 @@ public class User
 {
     [Key]
     public int Id { get; set; }
-    
+
     public string Name { get; set; }
-    
+
     public string Email { get; set; }
-    
+
     [Ignore]
     public string TemporaryData { get; set; }
-    
+
     [Serial]
     public DateTime CreatedAt { get; set; }
+}
+```
+
+#### サポートされている型
+
+ShuitNet.ORMは以下の型を明示的にサポートしています：
+
+**PostgreSQL:**
+- `Guid`, `Guid?` → UUID型
+- `DateTime`, `DateTime?` → TIMESTAMP型
+- `DateTimeOffset`, `DateTimeOffset?` → TIMESTAMPTZ型
+- `byte[]` → BYTEA型
+- `TimeSpan`, `TimeSpan?` → INTERVAL型
+- `bool`, `bool?` → BOOLEAN型
+- その他の基本型（int, long, string, decimal等）
+
+**MySQL:**
+- `Guid`, `Guid?` → GUID型（CHAR(36) または BINARY(16)）
+- `DateTime`, `DateTime?` → DATETIME型
+- `DateTimeOffset`, `DateTimeOffset?` → DATETIME型（UTC変換）
+- `byte[]` → BLOB型
+- `TimeSpan`, `TimeSpan?` → TIME型
+- `bool`, `bool?` → BIT型
+- `decimal`, `decimal?` → DECIMAL型
+- その他の基本型（int, long, string等）
+
+#### Guid型とstring型の相互変換
+
+PostgreSQLのUUID型カラムは、C#では`Guid`型または`string`型のどちらでも使用できます：
+
+```csharp
+public class Product
+{
+    [Key]
+    public Guid ProductId { get; set; }  // PostgreSQL: uuid型
+    public string Name { get; set; }
+}
+
+// または
+
+public class Product
+{
+    [Key]
+    public string ProductId { get; set; }  // PostgreSQL: uuid型（自動変換）
+    public string Name { get; set; }
 }
 ```
 

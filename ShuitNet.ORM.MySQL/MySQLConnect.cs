@@ -979,19 +979,110 @@ namespace ShuitNet.ORM.MySQL
             if (value == null || value is DBNull)
             {
                 command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                return;
             }
-            else if (value is Guid guidValue)
+
+            // Guid型は明示的にGuid型を指定
+            if (value is Guid guidValue)
             {
-                // Guid型は明示的にGuid型を指定
                 command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Guid) { Value = guidValue });
             }
             else if (value.GetType() == typeof(Guid?))
             {
-                // Nullable<Guid>型も明示的にGuid型を指定
                 var nullableGuid = (Guid?)value;
                 if (nullableGuid.HasValue)
                 {
                     command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Guid) { Value = nullableGuid.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // DateTime型は明示的にDateTime型を指定
+            else if (value is DateTime dateTimeValue)
+            {
+                command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.DateTime) { Value = dateTimeValue });
+            }
+            else if (value.GetType() == typeof(DateTime?))
+            {
+                var nullableDateTime = (DateTime?)value;
+                if (nullableDateTime.HasValue)
+                {
+                    command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.DateTime) { Value = nullableDateTime.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // DateTimeOffset型は明示的にDateTime型を指定（MySQLはタイムゾーンを文字列として扱う）
+            else if (value is DateTimeOffset dateTimeOffsetValue)
+            {
+                command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.DateTime) { Value = dateTimeOffsetValue.DateTime });
+            }
+            else if (value.GetType() == typeof(DateTimeOffset?))
+            {
+                var nullableDateTimeOffset = (DateTimeOffset?)value;
+                if (nullableDateTimeOffset.HasValue)
+                {
+                    command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.DateTime) { Value = nullableDateTimeOffset.Value.DateTime });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // byte[]型は明示的にBlob型を指定
+            else if (value is byte[] byteArrayValue)
+            {
+                command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Blob) { Value = byteArrayValue });
+            }
+            // TimeSpan型は明示的にTime型を指定
+            else if (value is TimeSpan timeSpanValue)
+            {
+                command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Time) { Value = timeSpanValue });
+            }
+            else if (value.GetType() == typeof(TimeSpan?))
+            {
+                var nullableTimeSpan = (TimeSpan?)value;
+                if (nullableTimeSpan.HasValue)
+                {
+                    command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Time) { Value = nullableTimeSpan.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // bool型は明示的にBit型を指定
+            else if (value is bool boolValue)
+            {
+                command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Bit) { Value = boolValue });
+            }
+            else if (value.GetType() == typeof(bool?))
+            {
+                var nullableBool = (bool?)value;
+                if (nullableBool.HasValue)
+                {
+                    command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Bit) { Value = nullableBool.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            // decimal型は明示的にDecimal型を指定
+            else if (value is decimal decimalValue)
+            {
+                command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Decimal) { Value = decimalValue });
+            }
+            else if (value.GetType() == typeof(decimal?))
+            {
+                var nullableDecimal = (decimal?)value;
+                if (nullableDecimal.HasValue)
+                {
+                    command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Decimal) { Value = nullableDecimal.Value });
                 }
                 else
                 {
