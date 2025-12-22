@@ -968,6 +968,66 @@ namespace ShuitNet.ORM.MySQL
             throw new ArgumentException("KeyAttribute not found.");
         }
 
+        /// <summary>
+        /// Add a single parameter to MySqlCommand with proper type handling
+        /// </summary>
+        /// <param name="command">MySqlCommand instance</param>
+        /// <param name="parameterName">Parameter name</param>
+        /// <param name="value">Parameter value</param>
+        private static void AddParameterWithProperType(MySqlCommand command, string parameterName, object? value)
+        {
+            if (value == null || value is DBNull)
+            {
+                command.Parameters.AddWithValue(parameterName, DBNull.Value);
+            }
+            else if (value is Guid guidValue)
+            {
+                // Guid型は明示的にGuid型を指定
+                command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Guid) { Value = guidValue });
+            }
+            else if (value.GetType() == typeof(Guid?))
+            {
+                // Nullable<Guid>型も明示的にGuid型を指定
+                var nullableGuid = (Guid?)value;
+                if (nullableGuid.HasValue)
+                {
+                    command.Parameters.Add(new MySqlParameter(parameterName, MySqlDbType.Guid) { Value = nullableGuid.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            else
+            {
+                command.Parameters.AddWithValue(parameterName, value);
+            }
+        }
+
+        /// <summary>
+        /// Add parameters to MySqlCommand with proper type handling
+        /// </summary>
+        private static void AddParameters(MySqlCommand command, object parameter)
+        {
+            // Dictionary<string, object>の場合
+            if (parameter is IDictionary<string, object> dict)
+            {
+                foreach (var kvp in dict)
+                {
+                    AddParameterWithProperType(command, kvp.Key, kvp.Value);
+                }
+            }
+            else
+            {
+                // 通常のオブジェクトの場合
+                foreach (var property in parameter.GetType().GetProperties())
+                {
+                    var value = property.GetValue(parameter);
+                    AddParameterWithProperType(command, property.Name, value);
+                }
+            }
+        }
+
         private static string ConvertToCamelCase(string pascalCaseStr)
         {
             pascalCaseStr = pascalCaseStr[..1].ToLower() + pascalCaseStr[1..];

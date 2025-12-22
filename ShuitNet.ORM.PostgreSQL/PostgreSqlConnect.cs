@@ -111,7 +111,7 @@ namespace ShuitNet.ORM.PostgreSQL
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"SELECT * FROM {tableName} WHERE \"{keyColumnName}\" = @key";
             await using NpgsqlCommand command = new(sql, _con);
-            command.Parameters.AddWithValue("key", key);
+            AddParameterWithProperType(command, "key", key);
             await using var reader = await command.ExecuteReaderAsync();
             if (!await reader.ReadAsync())
                 throw new InvalidOperationException("Sequence contains no elements.");
@@ -162,7 +162,8 @@ namespace ShuitNet.ORM.PostgreSQL
             await using NpgsqlCommand command = new(sql, _con);
             foreach (var property in key.GetType().GetProperties())
             {
-                command.Parameters.AddWithValue(property.Name, property.GetValue(key) ?? DBNull.Value);
+                var value = property.GetValue(key);
+                AddParameterWithProperType(command, property.Name, value);
             }
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -197,7 +198,8 @@ namespace ShuitNet.ORM.PostgreSQL
             await using NpgsqlCommand command = new(sql, _con);
             foreach (var property in parameter.GetType().GetProperties())
             {
-                command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
+                var value = property.GetValue(parameter);
+                AddParameterWithProperType(command, property.Name, value);
             }
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -294,7 +296,7 @@ namespace ShuitNet.ORM.PostgreSQL
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"DELETE FROM {tableName} WHERE \"{keyColumnName}\" = @key";
             await using NpgsqlCommand command = new(sql, _con);
-            command.Parameters.AddWithValue("key", key);
+            AddParameterWithProperType(command, "key", key);
             return await command.ExecuteNonQueryAsync();
         }
 
@@ -310,7 +312,7 @@ namespace ShuitNet.ORM.PostgreSQL
             await using NpgsqlCommand command = new(sql, _con);
             var key = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)
                 ?? throw new ArgumentException("Key is null.");
-            command.Parameters.AddWithValue("key", key);
+            AddParameterWithProperType(command, "key", key);
             return await command.ExecuteNonQueryAsync();
         }
 
@@ -398,11 +400,12 @@ namespace ShuitNet.ORM.PostgreSQL
                     }
                     else
                     {
-                        command.Parameters.AddWithValue(property.Name, propertyValue);
+                        AddParameterWithProperType(command, property.Name, propertyValue);
                     }
                 }
             }
-            command.Parameters.AddWithValue(keyColumnName, typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)!);
+            var keyValue = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)!;
+            AddParameterWithProperType(command, keyColumnName, keyValue);
             return await command.ExecuteNonQueryAsync();
         }
 
@@ -414,22 +417,7 @@ namespace ShuitNet.ORM.PostgreSQL
                 if (parameter == null)
                     return await command.ExecuteNonQueryAsync();
 
-                // Dictionary<string, object>の場合
-                if (parameter is IDictionary<string, object> dict)
-                {
-                    foreach (var kvp in dict)
-                    {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
-                    }
-                }
-                else
-                {
-                    // 通常のオブジェクトの場合
-                    foreach (var property in parameter.GetType().GetProperties())
-                    {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
-                    }
-                }
+                AddParameters(command, parameter);
                 return await command.ExecuteNonQueryAsync();
             }
             catch (NullReferenceException)
@@ -527,7 +515,7 @@ namespace ShuitNet.ORM.PostgreSQL
                     }
                     else
                     {
-                        command.Parameters.AddWithValue(property.Name, propertyValue);
+                        AddParameterWithProperType(command, property.Name, propertyValue);
                     }
                 }
             }
@@ -541,22 +529,7 @@ namespace ShuitNet.ORM.PostgreSQL
             await using NpgsqlCommand command = new(sql, _con);
             if (parameter != null)
             {
-                // Dictionary<string, object>の場合
-                if (parameter is IDictionary<string, object> dict)
-                {
-                    foreach (var kvp in dict)
-                    {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
-                    }
-                }
-                else
-                {
-                    // 通常のオブジェクトの場合
-                    foreach (var property in parameter.GetType().GetProperties())
-                    {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
-                    }
-                }
+                AddParameters(command, parameter);
             }
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -585,22 +558,7 @@ namespace ShuitNet.ORM.PostgreSQL
             await using NpgsqlCommand command = new(sql, _con);
             if (parameter != null)
             {
-                // Dictionary<string, object>の場合
-                if (parameter is IDictionary<string, object> dict)
-                {
-                    foreach (var kvp in dict)
-                    {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
-                    }
-                }
-                else
-                {
-                    // 通常のオブジェクトの場合
-                    foreach (var property in parameter.GetType().GetProperties())
-                    {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
-                    }
-                }
+                AddParameters(command, parameter);
             }
 
             await using var reader = await command.ExecuteReaderAsync();
@@ -634,22 +592,7 @@ namespace ShuitNet.ORM.PostgreSQL
             await using NpgsqlCommand command = new(sql, _con);
             if (parameter != null)
             {
-                // Dictionary<string, object>の場合
-                if (parameter is IDictionary<string, object> dict)
-                {
-                    foreach (var kvp in dict)
-                    {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
-                    }
-                }
-                else
-                {
-                    // 通常のオブジェクトの場合
-                    foreach (var property in parameter.GetType().GetProperties())
-                    {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
-                    }
-                }
+                AddParameters(command, parameter);
             }
 
             var result = await command.ExecuteScalarAsync();
@@ -1007,6 +950,66 @@ namespace ShuitNet.ORM.PostgreSQL
             throw new ArgumentException("KeyAttribute not found.");
         }
 
+        /// <summary>
+        /// Add a single parameter to NpgsqlCommand with proper type handling
+        /// </summary>
+        /// <param name="command">NpgsqlCommand instance</param>
+        /// <param name="parameterName">Parameter name</param>
+        /// <param name="value">Parameter value</param>
+        private static void AddParameterWithProperType(NpgsqlCommand command, string parameterName, object? value)
+        {
+            if (value == null || value is DBNull)
+            {
+                command.Parameters.AddWithValue(parameterName, DBNull.Value);
+            }
+            else if (value is Guid guidValue)
+            {
+                // Guid型は明示的にUuid型を指定
+                command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Uuid) { Value = guidValue });
+            }
+            else if (value.GetType() == typeof(Guid?))
+            {
+                // Nullable<Guid>型も明示的にUuid型を指定
+                var nullableGuid = (Guid?)value;
+                if (nullableGuid.HasValue)
+                {
+                    command.Parameters.Add(new NpgsqlParameter(parameterName, NpgsqlDbType.Uuid) { Value = nullableGuid.Value });
+                }
+                else
+                {
+                    command.Parameters.AddWithValue(parameterName, DBNull.Value);
+                }
+            }
+            else
+            {
+                command.Parameters.AddWithValue(parameterName, value);
+            }
+        }
+
+        /// <summary>
+        /// Add parameters to NpgsqlCommand with proper type handling
+        /// </summary>
+        private static void AddParameters(NpgsqlCommand command, object parameter)
+        {
+            // Dictionary<string, object>の場合
+            if (parameter is IDictionary<string, object> dict)
+            {
+                foreach (var kvp in dict)
+                {
+                    AddParameterWithProperType(command, kvp.Key, kvp.Value);
+                }
+            }
+            else
+            {
+                // 通常のオブジェクトの場合
+                foreach (var property in parameter.GetType().GetProperties())
+                {
+                    var value = property.GetValue(parameter);
+                    AddParameterWithProperType(command, property.Name, value);
+                }
+            }
+        }
+
         private static string ConvertToCamelCase(string pascalCaseStr)
         {
             pascalCaseStr = pascalCaseStr[..1].ToLower() + pascalCaseStr[1..];
@@ -1127,6 +1130,24 @@ namespace ShuitNet.ORM.PostgreSQL
                     {
                         property.SetValue(instance, value);
                     }
+                }
+                // Guid型とstring型の相互変換
+                else if (property.PropertyType == typeof(string) && value is Guid guidValue)
+                {
+                    property.SetValue(instance, guidValue.ToString());
+                }
+                else if (property.PropertyType == typeof(Guid) && value is string stringGuid)
+                {
+                    property.SetValue(instance, Guid.Parse(stringGuid));
+                }
+                // Guid?型とstring型の相互変換
+                else if (property.PropertyType == typeof(string) && value is Guid?)
+                {
+                    property.SetValue(instance, value?.ToString());
+                }
+                else if (property.PropertyType == typeof(Guid?) && value is string stringNullableGuid)
+                {
+                    property.SetValue(instance, Guid.Parse(stringNullableGuid));
                 }
                 else
                 {
