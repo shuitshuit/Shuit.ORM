@@ -28,6 +28,8 @@
   - [SerialAttribute](#serialattribute)
   - [ForeignKeyAttribute](#foreignkeyattribute)
   - [MaskAttribute](#maskattribute)
+  - [JsonAttribute](#jsonattribute)
+  - [JsonbAttribute](#jsonbattribute)
 - [命名規則](#命名規則)
 - [トランザクション](#トランザクション)
 - [ライセンス](#ライセンス)
@@ -48,8 +50,8 @@ ShuitNet.ORMは、.NET環境でPostgreSQLとMySQLデータベースを簡単に�
 - **外部キー対応**: ForeignKey属性によるリレーション処理
 - **マスキング機能**: データの自動マスキング処理
 - **複数データベース対応**: PostgreSQLとMySQLをサポート
-- **豊富な型サポート**: Guid, DateTime, DateTimeOffset, byte[], TimeSpan, bool, decimalなどの型を明示的にサポート
-- **型の自動変換**: Guid ⟷ string の相互変換をサポート
+- **豊富な型サポート**: Guid, DateTime, DateTimeOffset, byte[], TimeSpan, bool, decimal, JSON/JSONBなどの型を明示的にサポート
+- **型の自動変換**: Guid ⟷ string の相互変換、複雑な型のJSON自動変換をサポート
 
 ## インストール
 
@@ -104,6 +106,13 @@ public class User
 
     [Serial]
     public DateTime CreatedAt { get; set; }
+
+    // JSON/JSONB型の使用例
+    [Json]
+    public List<string> Roles { get; set; }
+
+    [Json]
+    public Dictionary<string, string> Preferences { get; set; }
 }
 ```
 
@@ -118,6 +127,9 @@ ShuitNet.ORMは以下の型を明示的にサポートしています：
 - `byte[]` → BYTEA型
 - `TimeSpan`, `TimeSpan?` → INTERVAL型
 - `bool`, `bool?` → BOOLEAN型
+- 複雑な型（`[Json]`属性）→ JSONB型
+- 複雑な型（`[Jsonb]`属性）→ JSONB型
+- `List<T>`、カスタムクラス等 → JSON/JSONB型（属性指定時）
 - その他の基本型（int, long, string, decimal等）
 
 **MySQL:**
@@ -128,6 +140,8 @@ ShuitNet.ORMは以下の型を明示的にサポートしています：
 - `TimeSpan`, `TimeSpan?` → TIME型
 - `bool`, `bool?` → BIT型
 - `decimal`, `decimal?` → DECIMAL型
+- 複雑な型（`[Json]`属性）→ JSON型
+- `List<T>`、カスタムクラス等 → JSON型（属性指定時）
 - その他の基本型（int, long, string等）
 
 #### Guid型とstring型の相互変換
@@ -302,6 +316,34 @@ public User User { get; set; }
 public string Password { get; set; }
 ```
 
+### JsonAttribute
+プロパティをJSON型としてシリアライズ/デシリアライズします。複雑なオブジェクトやリストをデータベースに保存する際に使用します。
+
+- **PostgreSQL**: JSONB型にマッピング
+- **MySQL**: JSON型にマッピング
+
+```csharp
+[Json]
+public List<string> Tags { get; set; }
+
+[Json]
+public Dictionary<string, object> Metadata { get; set; }
+
+[Json]
+public UserSettings Settings { get; set; }
+```
+
+### JsonbAttribute
+PostgreSQL専用の属性で、プロパティをJSONB型としてシリアライズ/デシリアライズします。
+
+```csharp
+[Jsonb]
+public List<Address> Addresses { get; set; }
+
+[Jsonb]
+public CustomObject Data { get; set; }
+```
+
 ## 命名規則
 
 デフォルトでは`CamelCase`が使用されますが、以下のように変更できます：
@@ -347,4 +389,4 @@ shuit (shuit.net)
 
 ## バージョン
 
-1.2.0
+1.3.4
