@@ -110,23 +110,31 @@ namespace ShuitNet.ORM.PostgreSQL
             var tableName = GetTableName<T>();
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"SELECT * FROM {tableName} WHERE \"{keyColumnName}\" = @key";
-            await using NpgsqlCommand command = new(sql, _con);
-            AddParameterWithProperType(command, "key", key);
-            await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-                throw new InvalidOperationException("Sequence contains no elements.");
 
-            var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-            for (var i = 0; i < reader.FieldCount; i++)
+            try
             {
-                string fieldName = reader.GetName(i);
-                // カラム名からプロパティ名を取得
-                var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                    ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                var value = reader.GetValue(i);
-                SetValue(property, ref instance, value);
+                await using NpgsqlCommand command = new(sql, _con);
+                AddParameterWithProperType(command, "key", key);
+                await using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync())
+                    throw new InvalidOperationException("Sequence contains no elements.");
+
+                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    string fieldName = reader.GetName(i);
+                    // カラム名からプロパティ名を取得
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                    var value = reader.GetValue(i);
+                    SetValue(property, ref instance, value);
+                }
+                return instance;
             }
-            return instance;
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetAsync", sql, new { key }, ex);
+            }
         }
 
         /// <summary>
@@ -159,30 +167,38 @@ namespace ShuitNet.ORM.PostgreSQL
                 .Aggregate(sql, (current, property) =>
                     current + $"\"{GetColumnName<T>(property)}\" = @{property.Name} AND ");
             sql = sql[..^5];
-            await using NpgsqlCommand command = new(sql, _con);
-            foreach (var property in key.GetType().GetProperties())
-            {
-                var value = property.GetValue(key);
-                AddParameterWithProperType(command, property.Name, value);
-            }
 
-            await using var reader = await command.ExecuteReaderAsync();
-            T[] values = [];
-            while (reader.Read())
+            try
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using NpgsqlCommand command = new(sql, _con);
+                foreach (var property in key.GetType().GetProperties())
                 {
-                    string fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    var value = property.GetValue(key);
+                    AddParameterWithProperType(command, property.Name, value);
                 }
-                values = values.Append(instance).ToArray();
+
+                await using var reader = await command.ExecuteReaderAsync();
+                T[] values = [];
+                while (reader.Read())
+                {
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        string fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    values = values.Append(instance).ToArray();
+                }
+                return values;
             }
-            return values;
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetMultipleAsync", sql, key, ex);
+            }
         }
 
         private async Task<T> GetByAnonymousAsync<T>(object parameter)
@@ -195,27 +211,35 @@ namespace ShuitNet.ORM.PostgreSQL
                 .Aggregate(sql, (current, property) =>
                 current + $"\"{GetColumnName<T>(property)}\" = @{property.Name} AND ");
             sql = sql[..^5];
-            await using NpgsqlCommand command = new(sql, _con);
-            foreach (var property in parameter.GetType().GetProperties())
-            {
-                var value = property.GetValue(parameter);
-                AddParameterWithProperType(command, property.Name, value);
-            }
 
-            await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) throw new InvalidOperationException("Sequence contains no elements.");
+            try
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using NpgsqlCommand command = new(sql, _con);
+                foreach (var property in parameter.GetType().GetProperties())
                 {
-                    string fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    var value = property.GetValue(parameter);
+                    AddParameterWithProperType(command, property.Name, value);
                 }
-                return instance;
+
+                await using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync()) throw new InvalidOperationException("Sequence contains no elements.");
+                {
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        string fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    return instance;
+                }
+            }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetByAnonymousAsync", sql, parameter, ex);
             }
         }
 
@@ -232,25 +256,33 @@ namespace ShuitNet.ORM.PostgreSQL
             var type = typeof(T);
             var tableName = GetTableName<T>();
             var sql = $"SELECT * FROM {tableName}";
-            await using NpgsqlCommand command = new(sql, _con);
-            await using var reader = await command.ExecuteReaderAsync();
-            List<T> list = [];
-            while (await reader.ReadAsync())
+
+            try
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using NpgsqlCommand command = new(sql, _con);
+                await using var reader = await command.ExecuteReaderAsync();
+                List<T> list = [];
+                while (await reader.ReadAsync())
                 {
-                    var fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = type.GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        var fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = type.GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    if (func(instance))
+                        list.Add(instance);
                 }
-                if (func(instance))
-                    list.Add(instance);
+                return list.Any() ? list : throw new InvalidOperationException("Sequence contains no elements.");
             }
-            return list.Any() ? list : throw new InvalidOperationException("Sequence contains no elements.");
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetAllAsync", sql, null, ex);
+            }
         }
 
         public IEnumerable<T> GetAll<T>(Func<T, bool> func) => GetAllAsync(func).Result;
@@ -260,24 +292,32 @@ namespace ShuitNet.ORM.PostgreSQL
             var type = typeof(T);
             var tableName = GetTableName<T>();
             var sql = $"SELECT * FROM {tableName}";
-            await using NpgsqlCommand command = new(sql, _con);
-            await using var reader = await command.ExecuteReaderAsync();
-            List<T> list = [];
-            while (await reader.ReadAsync())
+
+            try
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using NpgsqlCommand command = new(sql, _con);
+                await using var reader = await command.ExecuteReaderAsync();
+                List<T> list = [];
+                while (await reader.ReadAsync())
                 {
-                    var fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = type.GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        var fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = type.GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    list.Add(instance);
                 }
-                list.Add(instance);
+                return list;
             }
-            return list;
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetAllAsync", sql, null, ex);
+            }
         }
 
         public IEnumerable<T> GetAll<T>() => GetAllAsync<T>().Result;
@@ -295,9 +335,17 @@ namespace ShuitNet.ORM.PostgreSQL
             var tableName = GetTableName<T>();
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"DELETE FROM {tableName} WHERE \"{keyColumnName}\" = @key";
-            await using NpgsqlCommand command = new(sql, _con);
-            AddParameterWithProperType(command, "key", key);
-            return await command.ExecuteNonQueryAsync();
+
+            try
+            {
+                await using NpgsqlCommand command = new(sql, _con);
+                AddParameterWithProperType(command, "key", key);
+                return await command.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("DeleteAsync", sql, new { key }, ex);
+            }
         }
 
         public int Delete<T>(object key) => DeleteAsync<T>(key).Result;
@@ -309,11 +357,19 @@ namespace ShuitNet.ORM.PostgreSQL
             var tableName = GetTableName<T>();
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"DELETE FROM {tableName} WHERE \"{keyColumnName}\" = @key";
-            await using NpgsqlCommand command = new(sql, _con);
-            var key = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)
-                ?? throw new ArgumentException("Key is null.");
-            AddParameterWithProperType(command, "key", key);
-            return await command.ExecuteNonQueryAsync();
+
+            try
+            {
+                await using NpgsqlCommand command = new(sql, _con);
+                var key = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)
+                    ?? throw new ArgumentException("Key is null.");
+                AddParameterWithProperType(command, "key", key);
+                return await command.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException<T>("DeleteAsync", sql, instance, ex);
+            }
         }
 
         public int Delete<T>(T instance) => DeleteAsync(instance).Result;
@@ -332,81 +388,88 @@ namespace ShuitNet.ORM.PostgreSQL
                     current + $"\"{GetColumnName<T>(property)}\" = @{property.Name},");
             sql = sql[..^1] + $" WHERE \"{keyColumnName}\" = @{keyColumnName}";
 
-            await using NpgsqlCommand command = new(sql, _con);
-            foreach (var property in typeof(T).GetProperties())
+            try
             {
-                if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
-                    property.GetCustomAttribute<SerialAttribute>() != null)
+                await using NpgsqlCommand command = new(sql, _con);
+                foreach (var property in typeof(T).GetProperties())
                 {
-                    continue;
-                }
+                    if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
+                        property.GetCustomAttribute<SerialAttribute>() != null)
+                    {
+                        continue;
+                    }
 
-                var propertyValue = property.GetValue(instance);
-                var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
-                if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
-                {
-                    if (propertyValue == null) continue;
-                    // 外部キーの場合は値を変換する
-                    command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
-                }
-                else
-                {
-                    // nullの場合はDBNull.Valueを使用する
-                    if (propertyValue == null)
+                    var propertyValue = property.GetValue(instance);
+                    var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
+                    if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
                     {
-                        command.Parameters.AddWithValue(property.Name, DBNull.Value);
-                    }
-                    // JSONB型の場合はJSONシリアライズ
-                    else if (property.GetCustomAttribute<JsonbAttribute>() != null)
-                    {
-                        var json = JsonSerializer.Serialize(propertyValue);
-                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Jsonb)
-                        {
-                            Value = json
-                        };
-                        command.Parameters.Add(param);
-                    }
-                    // JSON型の場合はJSONシリアライズ
-                    else if (property.GetCustomAttribute<JsonAttribute>() != null)
-                    {
-                        var json = JsonSerializer.Serialize(propertyValue);
-                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Json)
-                        {
-                            Value = json
-                        };
-                        command.Parameters.Add(param);
-                    }
-                    // Enumの場合は文字列名に変換してUnknown型として設定（PostgreSQL ENUM型対応）
-                    else if (property.PropertyType.IsEnum)
-                    {
-                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Unknown)
-                        {
-                            Value = propertyValue.ToString()!
-                        };
-                        command.Parameters.Add(param);
-                    }
-                    // List<T>の場合は配列に変換
-                    else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
-                    {
-                        var elementType = property.PropertyType.GetGenericArguments()[0];
-                        if (elementType == typeof(string))
-                        {
-                            command.Parameters.AddWithValue(property.Name, ((IEnumerable<string>)propertyValue).ToArray());
-                        }
-                        else
-                        {
-                            command.Parameters.AddWithValue(property.Name, propertyValue);
-                        }
+                        if (propertyValue == null) continue;
+                        // 外部キーの場合は値を変換する
+                        command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
                     }
                     else
                     {
-                        AddParameterWithProperType(command, property.Name, propertyValue);
+                        // nullの場合はDBNull.Valueを使用する
+                        if (propertyValue == null)
+                        {
+                            command.Parameters.AddWithValue(property.Name, DBNull.Value);
+                        }
+                        // JSONB型の場合はJSONシリアライズ
+                        else if (property.GetCustomAttribute<JsonbAttribute>() != null)
+                        {
+                            var json = JsonSerializer.Serialize(propertyValue);
+                            var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Jsonb)
+                            {
+                                Value = json
+                            };
+                            command.Parameters.Add(param);
+                        }
+                        // JSON型の場合はJSONシリアライズ
+                        else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                        {
+                            var json = JsonSerializer.Serialize(propertyValue);
+                            var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Json)
+                            {
+                                Value = json
+                            };
+                            command.Parameters.Add(param);
+                        }
+                        // Enumの場合は文字列名に変換してUnknown型として設定（PostgreSQL ENUM型対応）
+                        else if (property.PropertyType.IsEnum)
+                        {
+                            var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Unknown)
+                            {
+                                Value = propertyValue.ToString()!
+                            };
+                            command.Parameters.Add(param);
+                        }
+                        // List<T>の場合は配列に変換
+                        else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
+                        {
+                            var elementType = property.PropertyType.GetGenericArguments()[0];
+                            if (elementType == typeof(string))
+                            {
+                                command.Parameters.AddWithValue(property.Name, ((IEnumerable<string>)propertyValue).ToArray());
+                            }
+                            else
+                            {
+                                command.Parameters.AddWithValue(property.Name, propertyValue);
+                            }
+                        }
+                        else
+                        {
+                            AddParameterWithProperType(command, property.Name, propertyValue);
+                        }
                     }
                 }
+                var keyValue = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)!;
+                AddParameterWithProperType(command, keyColumnName, keyValue);
+                return await command.ExecuteNonQueryAsync();
             }
-            var keyValue = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)!;
-            AddParameterWithProperType(command, keyColumnName, keyValue);
-            return await command.ExecuteNonQueryAsync();
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException<T>("UpdateAsync", sql, instance, ex);
+            }
         }
 
         public async Task<int> ExecuteAsync(string sql, object? parameter = null)
@@ -423,6 +486,10 @@ namespace ShuitNet.ORM.PostgreSQL
             catch (NullReferenceException)
             {
                 throw new ArgumentException("Invalid parameter.");
+            }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("ExecuteAsync", sql, parameter, ex);
             }
         }
 
@@ -453,128 +520,150 @@ namespace ShuitNet.ORM.PostgreSQL
             sql = sql[..^1] + ") ";
             values = values[..^1] + ")";
             sql += values;
-            await using NpgsqlCommand command = new(sql, _con);
-            foreach (var property in typeof(T).GetProperties())
+
+            try
             {
-                if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
-                    property.GetCustomAttribute<SerialAttribute>() != null)
-                    continue;
-
-                var propertyValue = property.GetValue(instance);
-                if (propertyValue == null) continue; // nullの場合は無視する
-
-                var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
-                if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
+                await using NpgsqlCommand command = new(sql, _con);
+                foreach (var property in typeof(T).GetProperties())
                 {
-                    // 外部キーの場合は値を変換する
-                    command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
-                }
-                else
-                {
-                    // JSONB型の場合はJSONシリアライズ
-                    if (property.GetCustomAttribute<JsonbAttribute>() != null)
+                    if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
+                        property.GetCustomAttribute<SerialAttribute>() != null)
+                        continue;
+
+                    var propertyValue = property.GetValue(instance);
+                    if (propertyValue == null) continue; // nullの場合は無視する
+
+                    var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
+                    if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
                     {
-                        var json = JsonSerializer.Serialize(propertyValue);
-                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Jsonb)
-                        {
-                            Value = json
-                        };
-                        command.Parameters.Add(param);
-                    }
-                    // JSON型の場合はJSONシリアライズ
-                    else if (property.GetCustomAttribute<JsonAttribute>() != null)
-                    {
-                        var json = JsonSerializer.Serialize(propertyValue);
-                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Json)
-                        {
-                            Value = json
-                        };
-                        command.Parameters.Add(param);
-                    }
-                    // Enumの場合は文字列名に変換してUnknown型として設定（PostgreSQL ENUM型対応）
-                    else if (property.PropertyType.IsEnum)
-                    {
-                        var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Unknown)
-                        {
-                            Value = propertyValue.ToString()!
-                        };
-                        command.Parameters.Add(param);
-                    }
-                    // List<T>の場合は配列に変換
-                    else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
-                    {
-                        var elementType = property.PropertyType.GetGenericArguments()[0];
-                        if (elementType == typeof(string))
-                        {
-                            command.Parameters.AddWithValue(property.Name, ((IEnumerable<string>)propertyValue).ToArray());
-                        }
-                        else
-                        {
-                            command.Parameters.AddWithValue(property.Name, propertyValue);
-                        }
+                        // 外部キーの場合は値を変換する
+                        command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
                     }
                     else
                     {
-                        AddParameterWithProperType(command, property.Name, propertyValue);
+                        // JSONB型の場合はJSONシリアライズ
+                        if (property.GetCustomAttribute<JsonbAttribute>() != null)
+                        {
+                            var json = JsonSerializer.Serialize(propertyValue);
+                            var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Jsonb)
+                            {
+                                Value = json
+                            };
+                            command.Parameters.Add(param);
+                        }
+                        // JSON型の場合はJSONシリアライズ
+                        else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                        {
+                            var json = JsonSerializer.Serialize(propertyValue);
+                            var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Json)
+                            {
+                                Value = json
+                            };
+                            command.Parameters.Add(param);
+                        }
+                        // Enumの場合は文字列名に変換してUnknown型として設定（PostgreSQL ENUM型対応）
+                        else if (property.PropertyType.IsEnum)
+                        {
+                            var param = new NpgsqlParameter(property.Name, NpgsqlDbType.Unknown)
+                            {
+                                Value = propertyValue.ToString()!
+                            };
+                            command.Parameters.Add(param);
+                        }
+                        // List<T>の場合は配列に変換
+                        else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
+                        {
+                            var elementType = property.PropertyType.GetGenericArguments()[0];
+                            if (elementType == typeof(string))
+                            {
+                                command.Parameters.AddWithValue(property.Name, ((IEnumerable<string>)propertyValue).ToArray());
+                            }
+                            else
+                            {
+                                command.Parameters.AddWithValue(property.Name, propertyValue);
+                            }
+                        }
+                        else
+                        {
+                            AddParameterWithProperType(command, property.Name, propertyValue);
+                        }
                     }
                 }
+                return await command.ExecuteNonQueryAsync();
             }
-            return await command.ExecuteNonQueryAsync();
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException<T>("InsertAsync", sql, instance, ex);
+            }
         }
 
         public int Insert<T>(T instance) => InsertAsync(instance).Result;
 
         public async Task<IEnumerable<T>> QueryAsync<T>(string sql, object? parameter = null)
         {
-            await using NpgsqlCommand command = new(sql, _con);
-            if (parameter != null)
+            try
             {
-                AddParameters(command, parameter);
-            }
-
-            await using var reader = await command.ExecuteReaderAsync();
-            List<T> list = [];
-            while (await reader.ReadAsync())
-            {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using NpgsqlCommand command = new(sql, _con);
+                if (parameter != null)
                 {
-                    string fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    AddParameters(command, parameter);
                 }
-                list.Add(instance);
+
+                await using var reader = await command.ExecuteReaderAsync();
+                List<T> list = [];
+                while (await reader.ReadAsync())
+                {
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        string fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    list.Add(instance);
+                }
+                return list;
             }
-            return list;
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("QueryAsync", sql, parameter, ex);
+            }
         }
 
         public IEnumerable<T> Query<T>(string sql, object? parameter = null) => QueryAsync<T>(sql, parameter).Result;
 
         public async Task<T> QueryFirstAsync<T>(string sql, object? parameter = null)
         {
-            await using NpgsqlCommand command = new(sql, _con);
-            if (parameter != null)
+            try
             {
-                AddParameters(command, parameter);
-            }
-
-            await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) throw new InvalidOperationException("Sequence contains no elements.");
-            {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using NpgsqlCommand command = new(sql, _con);
+                if (parameter != null)
                 {
-                    string fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    AddParameters(command, parameter);
                 }
-                return instance;
+
+                await using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync()) throw new InvalidOperationException("Sequence contains no elements.");
+                {
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        string fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    return instance;
+                }
+            }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("QueryFirstAsync", sql, parameter, ex);
             }
         }
 
@@ -589,17 +678,24 @@ namespace ShuitNet.ORM.PostgreSQL
         /// <returns>Scalar value</returns>
         public async Task<T> ExecuteScalarAsync<T>(string sql, object? parameter = null)
         {
-            await using NpgsqlCommand command = new(sql, _con);
-            if (parameter != null)
+            try
             {
-                AddParameters(command, parameter);
+                await using NpgsqlCommand command = new(sql, _con);
+                if (parameter != null)
+                {
+                    AddParameters(command, parameter);
+                }
+
+                var result = await command.ExecuteScalarAsync();
+                if (result == null || result is DBNull)
+                    return default(T)!;
+
+                return (T)Convert.ChangeType(result, typeof(T));
             }
-
-            var result = await command.ExecuteScalarAsync();
-            if (result == null || result is DBNull)
-                return default(T)!;
-
-            return (T)Convert.ChangeType(result, typeof(T));
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("ExecuteScalarAsync", sql, parameter, ex);
+            }
         }
 
         public T ExecuteScalar<T>(string sql, object? parameter = null) => ExecuteScalarAsync<T>(sql, parameter).Result;

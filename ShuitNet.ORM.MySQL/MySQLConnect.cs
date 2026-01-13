@@ -107,23 +107,31 @@ namespace ShuitNet.ORM.MySQL
             var tableName = GetTableName<T>();
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"SELECT * FROM {tableName} WHERE `{keyColumnName}` = @key";
-            await using MySqlCommand command = new(sql, _con);
-            command.Parameters.AddWithValue("key", key);
-            await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync())
-                throw new InvalidOperationException("Sequence contains no elements.");
 
-            var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-            for (var i = 0; i < reader.FieldCount; i++)
+            try
             {
-                string fieldName = reader.GetName(i);
-                // カラム名からプロパティ名を取得
-                var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                    ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                var value = reader.GetValue(i);
-                SetValue(property, ref instance, value);
+                await using MySqlCommand command = new(sql, _con);
+                command.Parameters.AddWithValue("key", key);
+                await using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync())
+                    throw new InvalidOperationException("Sequence contains no elements.");
+
+                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                for (var i = 0; i < reader.FieldCount; i++)
+                {
+                    string fieldName = reader.GetName(i);
+                    // カラム名からプロパティ名を取得
+                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                    var value = reader.GetValue(i);
+                    SetValue(property, ref instance, value);
+                }
+                return instance;
             }
-            return instance;
+            catch (Exception ex) when (ex is not InvalidOperationException && ex is not ArgumentException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetAsync", sql, new { key }, ex);
+            }
         }
 
         /// <summary>
@@ -156,29 +164,37 @@ namespace ShuitNet.ORM.MySQL
                 .Aggregate(sql, (current, property) =>
                     current + $"`{GetColumnName<T>(property)}` = @{property.Name} AND ");
             sql = sql[..^5];
-            await using MySqlCommand command = new(sql, _con);
-            foreach (var property in key.GetType().GetProperties())
-            {
-                command.Parameters.AddWithValue(property.Name, property.GetValue(key) ?? DBNull.Value);
-            }
 
-            await using var reader = await command.ExecuteReaderAsync();
-            T[] values = [];
-            while (await reader.ReadAsync())
+            try
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using MySqlCommand command = new(sql, _con);
+                foreach (var property in key.GetType().GetProperties())
                 {
-                    string fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    command.Parameters.AddWithValue(property.Name, property.GetValue(key) ?? DBNull.Value);
                 }
-                values = values.Append(instance).ToArray();
+
+                await using var reader = await command.ExecuteReaderAsync();
+                T[] values = [];
+                while (await reader.ReadAsync())
+                {
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        string fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    values = values.Append(instance).ToArray();
+                }
+                return values;
             }
-            return values;
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetMultipleAsync", sql, key, ex);
+            }
         }
 
         private async Task<T> GetByAnonymousAsync<T>(object parameter)
@@ -191,26 +207,34 @@ namespace ShuitNet.ORM.MySQL
                 .Aggregate(sql, (current, property) =>
                 current + $"`{GetColumnName<T>(property)}` = @{property.Name} AND ");
             sql = sql[..^5];
-            await using MySqlCommand command = new(sql, _con);
-            foreach (var property in parameter.GetType().GetProperties())
-            {
-                command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
-            }
 
-            await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) throw new InvalidOperationException("Sequence contains no elements.");
+            try
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using MySqlCommand command = new(sql, _con);
+                foreach (var property in parameter.GetType().GetProperties())
                 {
-                    string fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
                 }
-                return instance;
+
+                await using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync()) throw new InvalidOperationException("Sequence contains no elements.");
+                {
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        string fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    return instance;
+                }
+            }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetByAnonymousAsync", sql, parameter, ex);
             }
         }
 
@@ -227,25 +251,33 @@ namespace ShuitNet.ORM.MySQL
             var type = typeof(T);
             var tableName = GetTableName<T>();
             var sql = $"SELECT * FROM {tableName}";
-            await using MySqlCommand command = new(sql, _con);
-            await using var reader = await command.ExecuteReaderAsync();
-            List<T> list = [];
-            while (await reader.ReadAsync())
+
+            try
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using MySqlCommand command = new(sql, _con);
+                await using var reader = await command.ExecuteReaderAsync();
+                List<T> list = [];
+                while (await reader.ReadAsync())
                 {
-                    var fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = type.GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException("Property not found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        var fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = type.GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException("Property not found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    if (func(instance))
+                        list.Add(instance);
                 }
-                if (func(instance))
-                    list.Add(instance);
+                return list.Any() ? list : throw new InvalidOperationException("Sequence contains no elements.");
             }
-            return list.Any() ? list : throw new InvalidOperationException("Sequence contains no elements.");
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetAllAsync", sql, null, ex);
+            }
         }
 
         public IEnumerable<T> GetAll<T>(Func<T, bool> func) => GetAllAsync(func).Result;
@@ -255,24 +287,32 @@ namespace ShuitNet.ORM.MySQL
             var type = typeof(T);
             var tableName = GetTableName<T>();
             var sql = $"SELECT * FROM {tableName}";
-            await using MySqlCommand command = new(sql, _con);
-            await using var reader = await command.ExecuteReaderAsync();
-            List<T> list = [];
-            while (await reader.ReadAsync())
+
+            try
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using MySqlCommand command = new(sql, _con);
+                await using var reader = await command.ExecuteReaderAsync();
+                List<T> list = [];
+                while (await reader.ReadAsync())
                 {
-                    var fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = type.GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        var fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = type.GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    list.Add(instance);
                 }
-                list.Add(instance);
+                return list;
             }
-            return list;
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("GetAllAsync", sql, null, ex);
+            }
         }
 
         public IEnumerable<T> GetAll<T>() => GetAllAsync<T>().Result;
@@ -290,9 +330,17 @@ namespace ShuitNet.ORM.MySQL
             var tableName = GetTableName<T>();
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"DELETE FROM {tableName} WHERE `{keyColumnName}` = @key";
-            await using MySqlCommand command = new(sql, _con);
-            command.Parameters.AddWithValue("key", key);
-            return await command.ExecuteNonQueryAsync();
+
+            try
+            {
+                await using MySqlCommand command = new(sql, _con);
+                command.Parameters.AddWithValue("key", key);
+                return await command.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("DeleteAsync", sql, new { key }, ex);
+            }
         }
 
         public int Delete<T>(object key) => DeleteAsync<T>(key).Result;
@@ -304,11 +352,19 @@ namespace ShuitNet.ORM.MySQL
             var tableName = GetTableName<T>();
             var keyColumnName = GetKeyColumnName<T>();
             var sql = $"DELETE FROM {tableName} WHERE `{keyColumnName}` = @key";
-            await using MySqlCommand command = new(sql, _con);
-            var key = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)
-                ?? throw new ArgumentException("Key is null.");
-            command.Parameters.AddWithValue("key", key);
-            return await command.ExecuteNonQueryAsync();
+
+            try
+            {
+                await using MySqlCommand command = new(sql, _con);
+                var key = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)
+                    ?? throw new ArgumentException("Key is null.");
+                command.Parameters.AddWithValue("key", key);
+                return await command.ExecuteNonQueryAsync();
+            }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("DeleteAsync", sql, instance, ex);
+            }
         }
 
         public int Delete<T>(T instance) => DeleteAsync(instance).Result;
@@ -325,62 +381,69 @@ namespace ShuitNet.ORM.MySQL
                 .Aggregate(sql, (current, property) => current + $"`{GetColumnName<T>(property)}` = @{property.Name},");
             sql = sql[..^1] + $" WHERE `{keyColumnName}` = @{keyColumnName}";
 
-            await using MySqlCommand command = new(sql, _con);
-            foreach (var property in typeof(T).GetProperties())
+            try
             {
-                if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
-                    property.GetCustomAttribute<SerialAttribute>() != null)
+                await using MySqlCommand command = new(sql, _con);
+                foreach (var property in typeof(T).GetProperties())
                 {
-                    continue;
-                }
+                    if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
+                        property.GetCustomAttribute<SerialAttribute>() != null)
+                    {
+                        continue;
+                    }
 
-                var propertyValue = property.GetValue(instance);
-                var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
-                if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
-                {
-                    if (propertyValue == null) continue;
-                    // 外部キーの場合は値を変換する
-                    command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
-                }
-                else
-                {
-                    // nullの場合はDBNull.Valueを使用する
-                    if (propertyValue == null)
+                    var propertyValue = property.GetValue(instance);
+                    var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
+                    if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
                     {
-                        command.Parameters.AddWithValue(property.Name, DBNull.Value);
+                        if (propertyValue == null) continue;
+                        // 外部キーの場合は値を変換する
+                        command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
                     }
-                    // JSON型の場合はJSONシリアライズ (MySQLではJSON型にマッピング)
-                    else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                    else
                     {
-                        var json = JsonSerializer.Serialize(propertyValue);
-                        command.Parameters.AddWithValue(property.Name, json);
-                    }
-                    // Enumの場合は文字列名に変換（MySQL ENUM型対応）
-                    else if (property.PropertyType.IsEnum)
-                    {
-                        command.Parameters.AddWithValue(property.Name, propertyValue.ToString()!);
-                    }
-                    // List<T>の場合はJSON文字列に変換
-                    else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
-                    {
-                        var elementType = property.PropertyType.GetGenericArguments()[0];
-                        if (elementType == typeof(string))
+                        // nullの場合はDBNull.Valueを使用する
+                        if (propertyValue == null)
                         {
-                            command.Parameters.AddWithValue(property.Name, System.Text.Json.JsonSerializer.Serialize((IEnumerable<string>)propertyValue));
+                            command.Parameters.AddWithValue(property.Name, DBNull.Value);
+                        }
+                        // JSON型の場合はJSONシリアライズ (MySQLではJSON型にマッピング)
+                        else if (property.GetCustomAttribute<JsonAttribute>() != null)
+                        {
+                            var json = JsonSerializer.Serialize(propertyValue);
+                            command.Parameters.AddWithValue(property.Name, json);
+                        }
+                        // Enumの場合は文字列名に変換（MySQL ENUM型対応）
+                        else if (property.PropertyType.IsEnum)
+                        {
+                            command.Parameters.AddWithValue(property.Name, propertyValue.ToString()!);
+                        }
+                        // List<T>の場合はJSON文字列に変換
+                        else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
+                        {
+                            var elementType = property.PropertyType.GetGenericArguments()[0];
+                            if (elementType == typeof(string))
+                            {
+                                command.Parameters.AddWithValue(property.Name, System.Text.Json.JsonSerializer.Serialize((IEnumerable<string>)propertyValue));
+                            }
+                            else
+                            {
+                                command.Parameters.AddWithValue(property.Name, propertyValue);
+                            }
                         }
                         else
                         {
                             command.Parameters.AddWithValue(property.Name, propertyValue);
                         }
                     }
-                    else
-                    {
-                        command.Parameters.AddWithValue(property.Name, propertyValue);
-                    }
                 }
+                command.Parameters.AddWithValue(keyColumnName, typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)!);
+                return await command.ExecuteNonQueryAsync();
             }
-            command.Parameters.AddWithValue(keyColumnName, typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)!);
-            return await command.ExecuteNonQueryAsync();
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("UpdateAsync", sql, instance, ex);
+            }
         }
 
         public async Task<int> ExecuteAsync(string sql, object? parameter = null)
@@ -413,6 +476,10 @@ namespace ShuitNet.ORM.MySQL
             {
                 throw new ArgumentException("Invalid parameter.");
             }
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("ExecuteAsync", sql, parameter, ex);
+            }
         }
 
         public int Execute(string sql, object? parameter = null) => ExecuteAsync(sql, parameter).Result;
@@ -425,159 +492,181 @@ namespace ShuitNet.ORM.MySQL
             var tableName = GetTableName<T>();
             var sql = $"INSERT INTO {tableName} (";
             var values = "VALUES (";
-            foreach (var property in typeof(T).GetProperties())
+
+            try
             {
-                // IgnoreAttribute SerialAttributeが付与されている場合は無視する
-                if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
-                    property.GetCustomAttribute<SerialAttribute>() != null)
+                foreach (var property in typeof(T).GetProperties())
                 {
-                    continue;
-                }
-
-                if (property.GetValue(instance) == null) // nullの場合は無視する
-                    continue;
-
-                sql += $"`{GetColumnName<T>(property)}`,";
-                values += $"@{property.Name},";
-            }
-            sql = sql[..^1] + ") ";
-            values = values[..^1] + ")";
-            sql += values;
-            await using MySqlCommand command = new(sql, _con);
-            foreach (var property in typeof(T).GetProperties())
-            {
-                if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
-                    property.GetCustomAttribute<SerialAttribute>() != null)
-                    continue;
-
-                var propertyValue = property.GetValue(instance);
-                if (propertyValue == null) continue; // nullの場合は無視する
-
-                var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
-                if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
-                {
-                    // 外部キーの場合は値を変換する
-                    command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
-                }
-                else
-                {
-                    // JSON型の場合はJSONシリアライズ (MySQLではJSON型にマッピング)
-                    if (property.GetCustomAttribute<JsonAttribute>() != null)
+                    // IgnoreAttribute SerialAttributeが付与されている場合は無視する
+                    if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
+                        property.GetCustomAttribute<SerialAttribute>() != null)
                     {
-                        var json = JsonSerializer.Serialize(propertyValue);
-                        command.Parameters.AddWithValue(property.Name, json);
+                        continue;
                     }
-                    // Enumの場合は文字列名に変換（MySQL ENUM型対応）
-                    else if (property.PropertyType.IsEnum)
+
+                    if (property.GetValue(instance) == null) // nullの場合は無視する
+                        continue;
+
+                    sql += $"`{GetColumnName<T>(property)}`,";
+                    values += $"@{property.Name},";
+                }
+                sql = sql[..^1] + ") ";
+                values = values[..^1] + ")";
+                sql += values;
+                await using MySqlCommand command = new(sql, _con);
+                foreach (var property in typeof(T).GetProperties())
+                {
+                    if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
+                        property.GetCustomAttribute<SerialAttribute>() != null)
+                        continue;
+
+                    var propertyValue = property.GetValue(instance);
+                    if (propertyValue == null) continue; // nullの場合は無視する
+
+                    var foreignKey = property.GetCustomAttribute<ForeignKeyAttribute>();
+                    if (foreignKey is { Type: not null } && foreignKey.Type != property.PropertyType)
                     {
-                        command.Parameters.AddWithValue(property.Name, propertyValue.ToString()!);
+                        // 外部キーの場合は値を変換する
+                        command.Parameters.AddWithValue(property.Name, GetForeignKeyData(propertyValue, foreignKey.Type));
                     }
-                    // List<T>の場合は配列に変換またはJSON文字列に変換
-                    else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
+                    else
                     {
-                        var elementType = property.PropertyType.GetGenericArguments()[0];
-                        if (elementType == typeof(string))
+                        // JSON型の場合はJSONシリアライズ (MySQLではJSON型にマッピング)
+                        if (property.GetCustomAttribute<JsonAttribute>() != null)
                         {
-                            // MySQLの場合はJSON文字列として保存
-                            command.Parameters.AddWithValue(property.Name, System.Text.Json.JsonSerializer.Serialize((IEnumerable<string>)propertyValue));
+                            var json = JsonSerializer.Serialize(propertyValue);
+                            command.Parameters.AddWithValue(property.Name, json);
+                        }
+                        // Enumの場合は文字列名に変換（MySQL ENUM型対応）
+                        else if (property.PropertyType.IsEnum)
+                        {
+                            command.Parameters.AddWithValue(property.Name, propertyValue.ToString()!);
+                        }
+                        // List<T>の場合は配列に変換またはJSON文字列に変換
+                        else if (propertyValue is IEnumerable enumerable && property.PropertyType.IsGenericType)
+                        {
+                            var elementType = property.PropertyType.GetGenericArguments()[0];
+                            if (elementType == typeof(string))
+                            {
+                                // MySQLの場合はJSON文字列として保存
+                                command.Parameters.AddWithValue(property.Name, System.Text.Json.JsonSerializer.Serialize((IEnumerable<string>)propertyValue));
+                            }
+                            else
+                            {
+                                command.Parameters.AddWithValue(property.Name, propertyValue);
+                            }
                         }
                         else
                         {
                             command.Parameters.AddWithValue(property.Name, propertyValue);
                         }
                     }
-                    else
-                    {
-                        command.Parameters.AddWithValue(property.Name, propertyValue);
-                    }
                 }
+                return await command.ExecuteNonQueryAsync();
             }
-            return await command.ExecuteNonQueryAsync();
+            catch (Exception ex) when (ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("InsertAsync", sql, instance, ex);
+            }
         }
 
         public int Insert<T>(T instance) => InsertAsync(instance).Result;
 
         public async Task<IEnumerable<T>> QueryAsync<T>(string sql, object? parameter = null)
         {
-            await using MySqlCommand command = new(sql, _con);
-            if (parameter != null)
+            try
             {
-                // Dictionary<string, object>の場合
-                if (parameter is IDictionary<string, object> dict)
+                await using MySqlCommand command = new(sql, _con);
+                if (parameter != null)
                 {
-                    foreach (var kvp in dict)
+                    // Dictionary<string, object>の場合
+                    if (parameter is IDictionary<string, object> dict)
                     {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
+                        foreach (var kvp in dict)
+                        {
+                            command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
+                        }
+                    }
+                    else
+                    {
+                        // 通常のオブジェクトの場合
+                        foreach (var property in parameter.GetType().GetProperties())
+                        {
+                            command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
+                        }
                     }
                 }
-                else
-                {
-                    // 通常のオブジェクトの場合
-                    foreach (var property in parameter.GetType().GetProperties())
-                    {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
-                    }
-                }
-            }
 
-            await using var reader = await command.ExecuteReaderAsync();
-            List<T> list = [];
-            while (await reader.ReadAsync())
-            {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
+                await using var reader = await command.ExecuteReaderAsync();
+                List<T> list = [];
+                while (await reader.ReadAsync())
                 {
-                    string fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
+                    {
+                        string fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
+                    }
+                    list.Add(instance);
                 }
-                list.Add(instance);
+                return list;
             }
-            return list;
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("QueryAsync", sql, parameter, ex);
+            }
         }
 
         public IEnumerable<T> Query<T>(string sql, object? parameter = null) => QueryAsync<T>(sql, parameter).Result;
 
         public async Task<T> QueryFirstAsync<T>(string sql, object? parameter = null)
         {
-            await using MySqlCommand command = new(sql, _con);
-            if (parameter != null)
+            try
             {
-                // Dictionary<string, object>の場合
-                if (parameter is IDictionary<string, object> dict)
+                await using MySqlCommand command = new(sql, _con);
+                if (parameter != null)
                 {
-                    foreach (var kvp in dict)
+                    // Dictionary<string, object>の場合
+                    if (parameter is IDictionary<string, object> dict)
                     {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
+                        foreach (var kvp in dict)
+                        {
+                            command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
+                        }
+                    }
+                    else
+                    {
+                        // 通常のオブジェクトの場合
+                        foreach (var property in parameter.GetType().GetProperties())
+                        {
+                            command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
+                        }
                     }
                 }
-                else
+
+                await using var reader = await command.ExecuteReaderAsync();
+                if (!await reader.ReadAsync()) throw new InvalidOperationException("Sequence contains no elements.");
                 {
-                    // 通常のオブジェクトの場合
-                    foreach (var property in parameter.GetType().GetProperties())
+                    var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
+                    for (var i = 0; i < reader.FieldCount; i++)
                     {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
+                        string fieldName = reader.GetName(i);
+                        // カラム名からプロパティ名を取得
+                        var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
+                            ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
+                        var value = reader.GetValue(i);
+                        SetValue(property, ref instance, value);
                     }
+                    return instance;
                 }
             }
-
-            await using var reader = await command.ExecuteReaderAsync();
-            if (!await reader.ReadAsync()) throw new InvalidOperationException("Sequence contains no elements.");
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
             {
-                var instance = Activator.CreateInstance<T>(); // デフォルトコンストラクタを呼び出す
-                for (var i = 0; i < reader.FieldCount; i++)
-                {
-                    string fieldName = reader.GetName(i);
-                    // カラム名からプロパティ名を取得
-                    var property = typeof(T).GetProperty(GetPropertyName<T>(fieldName))
-                        ?? throw new InvalidOperationException($"No property matching {fieldName} was found.");
-                    var value = reader.GetValue(i);
-                    SetValue(property, ref instance, value);
-                }
-                return instance;
+                throw DatabaseErrorHelper.CreateException("QueryFirstAsync", sql, parameter, ex);
             }
         }
 
@@ -592,32 +681,39 @@ namespace ShuitNet.ORM.MySQL
         /// <returns>Scalar value</returns>
         public async Task<T> ExecuteScalarAsync<T>(string sql, object? parameter = null)
         {
-            await using MySqlCommand command = new(sql, _con);
-            if (parameter != null)
+            try
             {
-                // Dictionary<string, object>の場合
-                if (parameter is IDictionary<string, object> dict)
+                await using MySqlCommand command = new(sql, _con);
+                if (parameter != null)
                 {
-                    foreach (var kvp in dict)
+                    // Dictionary<string, object>の場合
+                    if (parameter is IDictionary<string, object> dict)
                     {
-                        command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
+                        foreach (var kvp in dict)
+                        {
+                            command.Parameters.AddWithValue(kvp.Key, kvp.Value ?? DBNull.Value);
+                        }
+                    }
+                    else
+                    {
+                        // 通常のオブジェクトの場合
+                        foreach (var property in parameter.GetType().GetProperties())
+                        {
+                            command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
+                        }
                     }
                 }
-                else
-                {
-                    // 通常のオブジェクトの場合
-                    foreach (var property in parameter.GetType().GetProperties())
-                    {
-                        command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
-                    }
-                }
+
+                var result = await command.ExecuteScalarAsync();
+                if (result == null || result is DBNull)
+                    return default(T)!;
+
+                return (T)Convert.ChangeType(result, typeof(T));
             }
-
-            var result = await command.ExecuteScalarAsync();
-            if (result == null || result is DBNull)
-                return default(T)!;
-
-            return (T)Convert.ChangeType(result, typeof(T));
+            catch (Exception ex) when (ex is not ArgumentException && ex is not InvalidOperationException && ex is not ArgumentNullException)
+            {
+                throw DatabaseErrorHelper.CreateException("ExecuteScalarAsync", sql, parameter, ex);
+            }
         }
 
         public T ExecuteScalar<T>(string sql, object? parameter = null) => ExecuteScalarAsync<T>(sql, parameter).Result;
