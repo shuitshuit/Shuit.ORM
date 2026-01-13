@@ -68,7 +68,13 @@ namespace ShuitNet.ORM.MySQL.LinqToSql
 
         public SqlResult BuildSql<T>(Expression expression)
         {
-            var tableName = MySQLConnect.GetTableName<T>();
+            // Expressionツリーから元のエンティティ型を取得
+            var sourceType = ExtractSourceElementType(expression);
+            var tableName = (string)typeof(MySQLConnect)
+                .GetMethod("GetTableName")!
+                .MakeGenericMethod(sourceType)
+                .Invoke(null, null)!;
+
             var selectClause = BuildSelectClause<T>(expression);
             var query = $"SELECT {selectClause} FROM {tableName}";
             var parameters = new Dictionary<string, object>();
@@ -93,6 +99,27 @@ namespace ShuitNet.ORM.MySQL.LinqToSql
             }
 
             return new SqlResult { Query = query, Parameters = parameters };
+        }
+
+        private Type ExtractSourceElementType(Expression expression)
+        {
+            if (expression is MethodCallExpression methodCall)
+            {
+                // 再帰的に最初のソースまで遡る
+                return ExtractSourceElementType(methodCall.Arguments[0]);
+            }
+            else if (expression is ConstantExpression constantExpression)
+            {
+                // Queryableのソース型を取得
+                var queryableType = constantExpression.Type;
+                if (queryableType.IsGenericType)
+                {
+                    return queryableType.GetGenericArguments()[0];
+                }
+            }
+
+            // フォールバック: 型パラメータを返す
+            return typeof(object);
         }
 
         private string BuildSelectClause<T>(Expression expression)
