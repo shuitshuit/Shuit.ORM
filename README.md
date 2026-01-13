@@ -31,6 +31,11 @@
   - [JsonAttribute](#jsonattribute)
   - [JsonbAttribute](#jsonbattribute)
 - [命名規則](#命名規則)
+- [エラーハンドリング](#エラーハンドリング)
+  - [環境別のエラー表示](#環境別のエラー表示)
+  - [設定方法](#設定方法)
+  - [Maskアトリビュートとの連携](#maskアトリビュートとの連携)
+  - [エラーのキャッチ](#エラーのキャッチ)
 - [トランザクション](#トランザクション)
 - [ライセンス](#ライセンス)
 - [作者](#作者)
@@ -49,6 +54,7 @@ ShuitNet.ORMは、.NET環境でPostgreSQLとMySQLデータベースを簡単に�
 - **命名規則の自動変換**: CamelCase, SnakeCase, KebabCase, PascalCaseに対応
 - **外部キー対応**: ForeignKey属性によるリレーション処理
 - **マスキング機能**: データの自動マスキング処理
+- **環境に応じたエラーハンドリング**: Development環境では詳細なエラー情報、Production環境では安全なエラーメッセージ
 - **複数データベース対応**: PostgreSQLとMySQLをサポート
 - **豊富な型サポート**: Guid, DateTime, DateTimeOffset, byte[], TimeSpan, bool, decimal, JSON/JSONBなどの型を明示的にサポート
 - **型の自動変換**: Guid ⟷ string の相互変換、複雑な型のJSON自動変換をサポート
@@ -309,12 +315,17 @@ public User User { get; set; }
 ```
 
 ### MaskAttribute
-データの自動マスキングを行います。
+データの自動マスキングを行います。また、エラー発生時のエラーメッセージ内でも自動的にマスキングされ、機密情報が露出しないようになっています。
 
 ```csharp
 [Mask('*')]
 public string Password { get; set; }
+
+[Mask]
+public string CreditCard { get; set; }
 ```
+
+詳細は[エラーハンドリング](#エラーハンドリング)のセクションを参照してください。
 
 ### JsonAttribute
 プロパティをJSON型としてシリアライズ/デシリアライズします。複雑なオブジェクトやリストをデータベースに保存する際に使用します。
@@ -379,6 +390,98 @@ catch
 }
 ```
 
+## エラーハンドリング
+
+ShuitNet.ORMは、環境に応じた詳細なエラーハンドリングをサポートしています。Development環境では実行されたSQL文とパラメータ情報を含む詳細なエラー情報を提供し、Production環境では機密情報を含まない安全なエラーメッセージを表示します。
+
+### 環境別のエラー表示
+
+#### Development環境
+```
+Database operation 'InsertAsync' failed. See Sql and ParametersInfo for details.
+SQL: INSERT INTO users (id, name, password, email) VALUES (@Id, @Name, @Password, @Email)
+Parameters: { Id = 1, Name = "John", Password = ***MASKED***, Email = "john@example.com" }
+InnerException: MySqlException: Duplicate entry '1' for key 'PRIMARY'
+```
+
+#### Production環境
+```
+Database operation 'InsertAsync' failed: Duplicate entry '1' for key 'PRIMARY'
+```
+
+### 設定方法
+
+ASP.NET Coreアプリケーションで`IHostEnvironment`を使用して環境を設定します：
+
+```csharp
+using ShuitNet.ORM;
+using Microsoft.Extensions.Hosting;
+using Microsoft.Extensions.Logging;
+
+// Program.cs または Startup.cs
+var builder = WebApplication.CreateBuilder(args);
+
+// エラーハンドリングの設定
+DatabaseErrorHelper.Configure(
+    builder.Environment,  // IHostEnvironment
+    builder.Services.BuildServiceProvider().GetService<ILogger<Program>>()  // ILogger (オプション)
+);
+
+var app = builder.Build();
+```
+
+`ILogger`を設定すると、エラー発生時に自動的にログに記録されます。
+
+### Maskアトリビュートとの連携
+
+`Mask`属性が付与されたプロパティは、エラーメッセージ内で自動的にマスキングされます：
+
+```csharp
+public class User
+{
+    [Key]
+    public int Id { get; set; }
+
+    public string Name { get; set; }
+
+    [Mask]  // エラーメッセージで自動マスク
+    public string Password { get; set; }
+
+    [Mask]
+    public string CreditCard { get; set; }
+}
+```
+
+エラー時の出力：
+```
+Parameters: { Id = 1, Name = "John", Password = ***MASKED***, CreditCard = ***MASKED*** }
+```
+
+### エラーのキャッチ
+
+`DatabaseException`をキャッチして詳細情報にアクセスできます：
+
+```csharp
+using ShuitNet.ORM;
+
+try
+{
+    await connection.InsertAsync(user);
+}
+catch (DatabaseException ex)
+{
+    // Development環境でのみ利用可能
+    Console.WriteLine($"SQL: {ex.Sql}");
+    Console.WriteLine($"Parameters: {ex.ParametersInfo}");
+
+    // 元の例外
+    Console.WriteLine($"Error: {ex.InnerException?.Message}");
+
+    // ログ記録
+    logger.LogError(ex, "データベース操作が失敗しました");
+}
+```
+
 ## ライセンス
 
 このプロジェクトはMITライセンスの下で公開されています。詳細については、[LICENSE.txt](LICENSE.txt)ファイルを参照してください。
@@ -389,4 +492,10 @@ shuit (shuit.net)
 
 ## バージョン
 
-1.3.4
+1.4.0 - エラーハンドリング機能を追加
+- 環境に応じたエラー表示（Development/Production）
+- IHostEnvironmentとILoggerの統合
+- Maskアトリビュートによる機密情報の自動マスキング
+- 全メソッドへのエラーハンドリング追加
+
+1.3.4 - JSON/JSONB型サポート追加
