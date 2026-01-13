@@ -103,22 +103,43 @@ namespace ShuitNet.ORM.MySQL.LinqToSql
 
         private Type ExtractSourceElementType(Expression expression)
         {
-            if (expression is MethodCallExpression methodCall)
+            // MethodCallExpressionの場合
+            if (expression is MethodCallExpression methodCall && methodCall.Arguments.Count > 0)
             {
                 // 再帰的に最初のソースまで遡る
                 return ExtractSourceElementType(methodCall.Arguments[0]);
             }
-            else if (expression is ConstantExpression constantExpression)
+
+            // ConstantExpressionに到達（クエリのルート）
+            if (expression is ConstantExpression constantExpression)
             {
-                // Queryableのソース型を取得
-                var queryableType = constantExpression.Type;
-                if (queryableType.IsGenericType)
+                // MySqlQueryable<T>の値から型を取得
+                if (constantExpression.Value != null)
                 {
-                    return queryableType.GetGenericArguments()[0];
+                    var valueType = constantExpression.Value.GetType();
+
+                    // IQueryable<T>インターフェースを探す
+                    var queryableInterface = valueType.GetInterfaces()
+                        .FirstOrDefault(i => i.IsGenericType && i.GetGenericTypeDefinition() == typeof(IQueryable<>));
+
+                    if (queryableInterface != null)
+                    {
+                        return queryableInterface.GetGenericArguments()[0];
+                    }
+
+                    // 直接型引数を取得
+                    if (valueType.IsGenericType)
+                    {
+                        var args = valueType.GetGenericArguments();
+                        if (args.Length > 0)
+                        {
+                            return args[0];
+                        }
+                    }
                 }
             }
 
-            // フォールバック: 型パラメータを返す
+            // フォールバック
             return typeof(object);
         }
 
