@@ -21,6 +21,7 @@ namespace ShuitNet.ORM.MySQL
         public string Password { get; set; }
         public string ConnectionString { get; set; }
         private readonly MySqlConnection _con;
+        private MySqlTransaction? _currentTransaction;
 
         public MySQLConnect(string host, int port, string database, string username,
             string password)
@@ -81,7 +82,68 @@ namespace ShuitNet.ORM.MySQL
 
         public void Close() => _con.Close();
 
-        public ValueTask<MySqlTransaction> BeginTransaction() => _con.BeginTransactionAsync();
+        public async ValueTask<MySqlTransaction> BeginTransactionAsync()
+        {
+            _currentTransaction = await _con.BeginTransactionAsync();
+            return _currentTransaction;
+        }
+
+        public async Task CommitAsync()
+        {
+            if (_currentTransaction == null)
+                throw new InvalidOperationException("No active transaction.");
+            await _currentTransaction.CommitAsync();
+            _currentTransaction = null;
+        }
+
+        public async Task RollbackAsync()
+        {
+            if (_currentTransaction == null)
+                throw new InvalidOperationException("No active transaction.");
+            await _currentTransaction.RollbackAsync();
+            _currentTransaction = null;
+        }
+
+        public async Task ExecuteInTransactionAsync(Func<Task> action)
+        {
+            await using var tx = await _con.BeginTransactionAsync();
+            _currentTransaction = tx;
+            try
+            {
+                await action();
+                await tx.CommitAsync();
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+            finally
+            {
+                _currentTransaction = null;
+            }
+        }
+
+        public async Task<T> ExecuteInTransactionAsync<T>(Func<Task<T>> action)
+        {
+            await using var tx = await _con.BeginTransactionAsync();
+            _currentTransaction = tx;
+            try
+            {
+                var result = await action();
+                await tx.CommitAsync();
+                return result;
+            }
+            catch
+            {
+                await tx.RollbackAsync();
+                throw;
+            }
+            finally
+            {
+                _currentTransaction = null;
+            }
+        }
 
         /// <summary>
         /// Retrieve data using the primary key value or an anonymous function.
@@ -111,6 +173,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 command.Parameters.AddWithValue("key", key);
                 await using var reader = await command.ExecuteReaderAsync();
                 if (!await reader.ReadAsync())
@@ -168,6 +231,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 foreach (var property in key.GetType().GetProperties())
                 {
                     command.Parameters.AddWithValue(property.Name, property.GetValue(key) ?? DBNull.Value);
@@ -211,6 +275,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 foreach (var property in parameter.GetType().GetProperties())
                 {
                     command.Parameters.AddWithValue(property.Name, property.GetValue(parameter) ?? DBNull.Value);
@@ -255,6 +320,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 await using var reader = await command.ExecuteReaderAsync();
                 List<T> list = [];
                 while (await reader.ReadAsync())
@@ -291,6 +357,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 await using var reader = await command.ExecuteReaderAsync();
                 List<T> list = [];
                 while (await reader.ReadAsync())
@@ -334,6 +401,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 command.Parameters.AddWithValue("key", key);
                 return await command.ExecuteNonQueryAsync();
             }
@@ -356,6 +424,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 var key = typeof(T).GetProperty(GetPropertyName<T>(keyColumnName))?.GetValue(instance)
                     ?? throw new ArgumentException("Key is null.");
                 command.Parameters.AddWithValue("key", key);
@@ -384,6 +453,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 foreach (var property in typeof(T).GetProperties())
                 {
                     if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
@@ -451,6 +521,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 if (parameter == null)
                     return await command.ExecuteNonQueryAsync();
 
@@ -514,6 +585,7 @@ namespace ShuitNet.ORM.MySQL
                 values = values[..^1] + ")";
                 sql += values;
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 foreach (var property in typeof(T).GetProperties())
                 {
                     if (property.GetCustomAttribute<IgnoreAttribute>() != null ||
@@ -577,6 +649,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 if (parameter != null)
                 {
                     // Dictionary<string, object>の場合
@@ -628,6 +701,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 if (parameter != null)
                 {
                     // Dictionary<string, object>の場合
@@ -684,6 +758,7 @@ namespace ShuitNet.ORM.MySQL
             try
             {
                 await using MySqlCommand command = new(sql, _con);
+                command.Transaction = _currentTransaction;
                 if (parameter != null)
                 {
                     // Dictionary<string, object>の場合
